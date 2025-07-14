@@ -4,9 +4,9 @@
 #include <Preferences.h>
 #include <time.h>
 
-// Configuración WiFi - CAMBIA ESTOS VALORES
-const char* ssid = "TU_WIFI_SSID";
-const char* password = "TU_WIFI_PASSWORD";
+// Configuración WiFi
+const char* ssid = "DvEstudios_5G";
+const char* password = "02569833";
 
 // Configuración del servidor web
 WebServer server(80);
