@@ -4,13 +4,13 @@
 
 ### **Hardware Principal:**
 - ✅ ESP32 DevKit v1 (30 pines)
-- ✅ Módulo Relé 5V - 1 Canal 
-- ✅ Fuente 5V/2A (para el relé)
+- ✅ 2x Módulo Relé 5V - 1 Canal cada uno
+- ✅ Fuente 5V/2A (para los relés)
 - ✅ LED 5mm (indicador - opcional)
 - ✅ Resistencia 220Ω (para LED)
 - ✅ Cables jumper macho-hembra
 - ✅ Protoboard o PCB
-- ✅ Borneras para conexión del timbre
+- ✅ Borneras para conexión de los timbres
 - ✅ Caja protectora
 
 ### **Herramientas:**
@@ -21,7 +21,7 @@
 
 ---
 
-## 🔌 **DIAGRAMA DE CONEXIONES**
+## 🔌 **DIAGRAMA DE CONEXIONES - 2 RELÉS**
 
 ```
                     ┌─────────────────────────┐
@@ -30,31 +30,57 @@
                     │  3V3 ──────────────┐    │
                     │  GND ──────────┐   │    │
                     │  GPIO 2 ───┐   │   │    │
-                    │  GPIO 23 ──│───│───│──┐ │
-                    │            │   │   │  │ │
-                    └────────────│───│───│──│─┘
-                                 │   │   │  │
-                                 │   │   │  │
-                    ┌────────────│───│───│──│─┐
-                    │            │   │   │  │ │  
-                    │     MÓDULO RELÉ 5V     │
-                    │                        │
-                    │  VCC ──────────────────┘ │
-                    │  GND ──────────────────┐ │
-                    │  IN ───────────────────┘ │
-                    │                          │
-                    │  COM ─┐                  │
-                    │  NO ──│─── SALIDA        │
-                    │  NC ─ │                  │
-                    └───────│──────────────────┘
-                            │
-                            │
-                    ┌───────│──────────────────┐
-                    │       │     TIMBRE       │
+                    │  GPIO 4 ───│─┐ │   │    │
+                    │  GPIO 23 ──│─│─│───│──┐ │
+                    │            │ │ │   │  │ │
+                    └────────────│─│─│───│──│─┘
+                                 │ │ │   │  │
+                                 │ │ │   │  │
+                    ┌────────────│─│─│───│──│─┐
+                    │     RELÉ 1 │ │ │   │  │ │  
+                    │  (TIMBRE 1)│ │ │   │  │ │
+                    │            │ │ │   │  │ │
+                    │  VCC ──────┘ │ │   │  │ │
+                    │  GND ────────│─│───┘  │ │
+                    │  IN ─────────┘ │      │ │
+                    │                │      │ │
+                    │  COM ─┐        │      │ │
+                    │  NO ──│─ SALIDA 1     │ │
+                    │  NC ─ │        │      │ │
+                    └───────│────────│──────│─┘
+                            │        │      │
+                    ┌───────│────────│──────│─┐
+                    │       │ RELÉ 2 │      │ │  
+                    │       │(TIMBRE 2)     │ │
+                    │       │        │      │ │
+                    │  VCC ─│────────│──────┘ │
+                    │  GND ─│────────┘        │
+                    │  IN ──│─────────────────┘
                     │       │                  │
-                    │  FASE │                  │
-                    │   ~~~~│~~~~~~~~~~~~~~~~~~ │
-                    │       └─ Contacto Relé   │
+                    │  COM ─│─┐                │
+                    │  NO ──│─│─ SALIDA 2      │
+                    │  NC ─ │ │                │
+                    └───────│─│────────────────┘
+                            │ │
+                            │ │
+                    ┌───────│─│────────────────┐
+                    │       │ │   TIMBRE 1     │
+                    │       │ │                │
+                    │  FASE │ │                │
+                    │   ~~~~│~│~~~~~~~~~~~~~~~ │
+                    │       └─│ Contacto Relé1 │
+                    │         │                │
+                    │  NEUTRO │~~~~~~~~~~~~~~~~ │
+                    │         │                │
+                    │  TIERRA │~~~~~~~~~~~~~~~~ │
+                    └─────────│────────────────┘
+                              │
+                    ┌─────────│────────────────┐
+                    │         │   TIMBRE 2     │
+                    │         │                │
+                    │    FASE │                │
+                    │     ~~~~│~~~~~~~~~~~~~~~ │
+                    │         └ Contacto Relé2 │
                     │                          │
                     │  NEUTRO ~~~~~~~~~~~~~~~~~ │
                     │                          │
@@ -72,12 +98,19 @@
 
 ## 🔗 **CONEXIONES DETALLADAS**
 
-### **ESP32 → Módulo Relé:**
-| ESP32 Pin | Relé Pin | Función |
-|-----------|----------|---------|
-| `3.3V`    | `VCC`    | Alimentación |
-| `GND`     | `GND`    | Tierra |
-| `GPIO 2`  | `IN`     | Señal control |
+### **ESP32 → Módulo Relé 1 (Timbre 1):**
+| ESP32 Pin | Relé 1 Pin | Función |
+|-----------|------------|---------|
+| `3.3V`    | `VCC`      | Alimentación |
+| `GND`     | `GND`      | Tierra |
+| `GPIO 2`  | `IN`       | Señal control |
+
+### **ESP32 → Módulo Relé 2 (Timbre 2):**
+| ESP32 Pin | Relé 2 Pin | Función |
+|-----------|------------|---------|
+| `3.3V`    | `VCC`      | Alimentación |
+| `GND`     | `GND`      | Tierra |
+| `GPIO 4`  | `IN`       | Señal control |
 
 ### **ESP32 → LED Indicador (Opcional):**
 | ESP32 Pin | Componente | Función |
@@ -85,12 +118,19 @@
 | `GPIO 23` | Resistencia 220Ω → LED (+) | Señal |
 | `GND`     | LED (-)    | Tierra |
 
-### **Relé → Timbre:**
-| Relé Pin | Timbre | Función |
-|----------|--------|---------|
-| `COM`    | Fase cortada | Común |
-| `NO`     | Hacia timbre | Normalmente abierto |
-| `NC`     | (Sin conexión) | Normalmente cerrado |
+### **Relé 1 → Timbre 1:**
+| Relé 1 Pin | Timbre 1 | Función |
+|------------|----------|---------|
+| `COM`      | Fase cortada | Común |
+| `NO`       | Hacia timbre 1 | Normalmente abierto |
+| `NC`       | (Sin conexión) | Normalmente cerrado |
+
+### **Relé 2 → Timbre 2:**
+| Relé 2 Pin | Timbre 2 | Función |
+|------------|----------|---------|
+| `COM`      | Fase cortada | Común |
+| `NO`       | Hacia timbre 2 | Normalmente abierto |
+| `NC`       | (Sin conexión) | Normalmente cerrado |
 
 ---
 
@@ -142,12 +182,16 @@ Herramientas → Flash Size: "4MB"
 4. **Caja protectora** para toda la electrónica
 5. **Revisión por electricista** antes de energizar
 
-### **🔒 Conexión segura del timbre:**
+### **🔒 Conexión segura de ambos timbres:**
 ```
 PELIGRO: 110V/220V
-├── Fase ──── Interruptor ──── Relé COM
-├── Relé NO ──── Timbre (+)
-└── Neutro ──── Timbre (-)
+├── Fase ──── Interruptor ──── Relé 1 COM
+├── Relé 1 NO ──── Timbre 1 (+)
+├── Neutro ──── Timbre 1 (-)
+
+├── Fase ──── Interruptor ──── Relé 2 COM  
+├── Relé 2 NO ──── Timbre 2 (+)
+└── Neutro ──── Timbre 2 (-)
 ```
 
 ---
@@ -161,9 +205,10 @@ PELIGRO: 110V/220V
 - [ ] Caja protectora
 
 ### **2. Hacer conexiones:**
-- [ ] ESP32 ↔ Relé (3.3V, GND, GPIO2)
+- [ ] ESP32 ↔ Relé 1 (3.3V, GND, GPIO2)
+- [ ] ESP32 ↔ Relé 2 (3.3V, GND, GPIO4)
 - [ ] LED indicador (opcional)
-- [ ] Probar con multímetro
+- [ ] Probar ambos relés con multímetro
 
 ### **3. Programar ESP32:**
 - [ ] Instalar librerías
@@ -173,7 +218,8 @@ PELIGRO: 110V/220V
 
 ### **4. Instalación eléctrica:**
 - [ ] ⚠️ CORTAR ENERGÍA
-- [ ] Conectar relé en serie con timbre
+- [ ] Conectar relé 1 en serie con timbre 1
+- [ ] Conectar relé 2 en serie con timbre 2
 - [ ] Borneras bien apretadas
 - [ ] Caja cerrada
 - [ ] ⚠️ REVISAR TODO DOS VECES
@@ -181,29 +227,43 @@ PELIGRO: 110V/220V
 ### **5. Pruebas:**
 - [ ] Energizar sistema
 - [ ] Conectar app web
-- [ ] Probar timbre continuo
-- [ ] Probar timbre intermitente
-- [ ] Configurar horarios
+- [ ] Probar timbre 1 continuo/intermitente
+- [ ] Probar timbre 2 continuo/intermitente
+- [ ] Probar ambos timbres juntos
+- [ ] Configurar horarios con diferentes relés
 
 ---
 
 ## 📱 **CÓDIGO DE EJEMPLO MÍNIMO PARA PROBAR:**
 
 ```cpp
-// Código mínimo para probar el relé
+// Código mínimo para probar ambos relés
 void setup() {
-  pinMode(2, OUTPUT);  // Pin del relé
+  pinMode(2, OUTPUT);  // Pin del relé 1
+  pinMode(4, OUTPUT);  // Pin del relé 2
   Serial.begin(115200);
-  Serial.println("Probando relé...");
+  Serial.println("Probando ambos relés...");
 }
 
 void loop() {
-  Serial.println("Activando relé 3 segundos");
-  digitalWrite(2, HIGH);  // Activar
-  delay(3000);
+  Serial.println("Activando Relé 1 por 2 segundos");
+  digitalWrite(2, HIGH);  // Activar relé 1
+  delay(2000);
+  digitalWrite(2, LOW);   // Desactivar relé 1
+  delay(1000);
   
-  Serial.println("Desactivando relé 2 segundos");
-  digitalWrite(2, LOW);   // Desactivar
+  Serial.println("Activando Relé 2 por 2 segundos");
+  digitalWrite(4, HIGH);  // Activar relé 2
+  delay(2000);
+  digitalWrite(4, LOW);   // Desactivar relé 2
+  delay(1000);
+  
+  Serial.println("Activando AMBOS relés por 3 segundos");
+  digitalWrite(2, HIGH);  // Activar ambos
+  digitalWrite(4, HIGH);
+  delay(3000);
+  digitalWrite(2, LOW);   // Desactivar ambos
+  digitalWrite(4, LOW);
   delay(2000);
 }
 ```
@@ -215,10 +275,13 @@ void loop() {
 | Problema | Solución |
 |----------|----------|
 | ESP32 no conecta WiFi | Verificar SSID y password |
-| Relé no activa | Revisar conexión GPIO 2 |
+| Relé 1 no activa | Revisar conexión GPIO 2 |
+| Relé 2 no activa | Revisar conexión GPIO 4 |
 | No aparece IP | Abrir monitor serie 115200 baudios |
-| Timbre no suena | Verificar conexiones 110V/220V |
+| Timbre 1 no suena | Verificar conexiones 110V/220V relé 1 |
+| Timbre 2 no suena | Verificar conexiones 110V/220V relé 2 |
 | App no conecta | Verificar IP del ESP32 |
+| Solo funciona un relé | Verificar alimentación y GPIO del otro |
 
 ---
 
@@ -226,12 +289,13 @@ void loop() {
 
 - [ ] Todas las librerías instaladas
 - [ ] Código compilado sin errores
-- [ ] Conexiones ESP32 ↔ Relé verificadas
+- [ ] Conexiones ESP32 ↔ Relé 1 verificadas
+- [ ] Conexiones ESP32 ↔ Relé 2 verificadas
 - [ ] WiFi configurado correctamente
 - [ ] Caja protectora instalada
-- [ ] ⚠️ Instalación eléctrica revisada por electricista
-- [ ] Pruebas de funcionamiento OK
-- [ ] App web configurada y probada
+- [ ] ⚠️ Instalación eléctrica de ambos timbres revisada por electricista
+- [ ] Pruebas de funcionamiento de ambos relés OK
+- [ ] App web configurada y probada con ambos timbres
 
 ---
 
