@@ -5,7 +5,7 @@
 #include <time.h>
 
 // Configuración WiFi
-const char* ssid = "DvEstudios_5G";
+const char* ssid = "DvEstudios";
 const char* password = "02569833";
 
 // Configuración del servidor web
