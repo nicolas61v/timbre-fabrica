@@ -1,553 +1,448 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Timbre - Fábrica</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ArduinoJson.h>
+#include <Preferences.h>
+#include <time.h>
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
+// Configuración WiFi - CAMBIA ESTOS VALORES
+const char* ssid = "TU_WIFI_SSID";
+const char* password = "TU_WIFI_PASSWORD";
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
+// Configuración del servidor web
+WebServer server(80);
 
-        .header {
-            background: linear-gradient(135deg, #2c3e50, #34495e);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
+// Configuración de pines
+const int RELAY_PIN_1 = 2;  // Pin para controlar el relé del timbre 1
+const int RELAY_PIN_2 = 4;  // Pin para controlar el relé del timbre 2
+const int LED_PIN = 23;     // LED indicador (opcional)
 
-        .header h1 {
-            font-size: 2rem;
-            margin-bottom: 10px;
-        }
+// Almacenamiento persistente
+Preferences preferences;
 
-        .status {
-            background: #ecf0f1;
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
+// Estructura para los horarios
+struct Schedule {
+  int id;
+  String name;
+  int hour;
+  int minute;
+  int duration;
+  String type;  // "continuo" o "intermitente"
+  String relay; // "1", "2", o "both"
+  bool enabled;
+};
 
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+// Variables globales
+Schedule schedules[10];  // Máximo 10 horarios
+int scheduleCount = 0;
+unsigned long lastTimeCheck = 0;
+bool timbreActive = false;
+unsigned long timbreStartTime = 0;
+int currentTimbreDuration = 0;
+String currentTimbreType = "continuo";
+String currentTimbreRelay = "1";
+bool intermittentState = false;  // Para timbre intermitente: false=primera parte, true=pausa/segunda parte
+unsigned long intermittentStateTime = 0;
 
-        .status-light {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #e74c3c;
-            animation: pulse 2s infinite;
-        }
+// Configuración de zona horaria (Colombia UTC-5)
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = -5 * 3600;  // UTC-5 para Colombia
+const int daylightOffset_sec = 0;
 
-        .status-light.connected {
-            background: #27ae60;
-        }
+void setup() {
+  Serial.begin(115200);
+  Serial.println("\n=== SISTEMA DE CONTROL DE TIMBRE ===");
+  Serial.println("Iniciando ESP32...");
+  
+  // Configurar pines
+  pinMode(RELAY_PIN_1, OUTPUT);
+  pinMode(RELAY_PIN_2, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN_1, LOW);
+  digitalWrite(RELAY_PIN_2, LOW);
+  digitalWrite(LED_PIN, LOW);
+  
+  // Inicializar almacenamiento
+  preferences.begin("timbre", false);
+  
+  // Conectar a WiFi
+  WiFi.begin(ssid, password);
+  Serial.print("Conectando a WiFi");
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+    delay(1000);
+    Serial.print(".");
+    attempts++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi conectado!");
+    Serial.print("Dirección IP: ");
+    Serial.println(WiFi.localIP());
+    
+    // Configurar tiempo por NTP
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    
+    // Esperar sincronización de tiempo
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      Serial.println("Tiempo sincronizado con NTP");
+    }
+  } else {
+    Serial.println("\nNo se pudo conectar a WiFi. Continuando sin conexión...");
+  }
+  
+  // Cargar horarios guardados
+  loadSchedules();
+  
+  // Configurar rutas del servidor web
+  setupWebServer();
+  
+  // Iniciar servidor
+  server.begin();
+  Serial.println("Servidor web iniciado");
+  Serial.println("=================================\n");
+  
+  // Indicar que está listo
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(LED_PIN, HIGH);
+    delay(200);
+    digitalWrite(LED_PIN, LOW);
+    delay(200);
+  }
+}
 
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
+void loop() {
+  // Manejar cliente web
+  server.handleClient();
+  
+  // Verificar horarios cada segundo
+  unsigned long currentTime = millis();
+  if (currentTime - lastTimeCheck >= 1000) {
+    lastTimeCheck = currentTime;
+    checkSchedules();
+  }
+  
+  // Controlar duración del timbre
+  if (timbreActive) {
+    if (currentTimbreType == "continuo") {
+      // Timbre continuo - como antes
+      if (currentTime - timbreStartTime >= currentTimbreDuration * 1000) {
+        stopBell();
+      }
+    } else if (currentTimbreType == "intermitente") {
+      // Timbre intermitente - manejo especial
+      handleIntermittentBell(currentTime);
+    }
+  }
+  
+  delay(100);
+}
 
-        .main-content {
-            padding: 30px;
-        }
-
-        .section {
-            margin-bottom: 30px;
-        }
-
-        .section h2 {
-            color: #2c3e50;
-            margin-bottom: 15px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #3498db;
-        }
-
-        .esp32-config {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .input-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        input, select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-
-        input:focus, select:focus {
-            outline: none;
-            border-color: #3498db;
-        }
-
-        .schedule-item {
-            background: #f8f9fa;
-            padding: 20px;
-            margin-bottom: 15px;
-            border-radius: 8px;
-            border-left: 4px solid #3498db;
-        }
-
-        .schedule-controls {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
-            gap: 15px;
-            align-items: end;
-        }
-
-        @media (max-width: 768px) {
-            .schedule-controls {
-                grid-template-columns: 1fr;
-                gap: 10px;
-            }
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
-            background: #3498db;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
-        }
-
-        .btn-success {
-            background: #27ae60;
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: #219a52;
-        }
-
-        .btn-warning {
-            background: #f39c12;
-            color: white;
-        }
-
-        .btn-warning:hover {
-            background: #e67e22;
-        }
-
-        .btn-danger {
-            background: #e74c3c;
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #c0392b;
-        }
-
-        .btn-test {
-            background: #9b59b6;
-            color: white;
-            width: 100%;
-            margin: 20px 0;
-            padding: 15px;
-            font-size: 18px;
-        }
-
-        .btn-test:hover {
-            background: #8e44ad;
-        }
-
-        .alert {
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .connection-panel {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 15px;
-            align-items: end;
-        }
-
-        @media (max-width: 480px) {
-            .connection-panel {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🏭 Control de Timbre</h1>
-            <p>Sistema de Control para Fábrica de Galvanizado</p>
-        </div>
-
-        <div class="status">
-            <div class="status-item">
-                <div class="status-light" id="connectionLight"></div>
-                <span>ESP32: <span id="connectionStatus">Desconectado</span></span>
-            </div>
-            <div class="status-item">
-                <span>⏰ <span id="currentTime">--:--:--</span></span>
-            </div>
-            <div class="status-item">
-                <span>📅 <span id="currentDate">----/--/--</span></span>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <div class="alert alert-success" id="successAlert"></div>
-            <div class="alert alert-error" id="errorAlert"></div>
-
-            <div class="section">
-                <h2>🔗 Conexión ESP32</h2>
-                <div class="esp32-config">
-                    <div class="connection-panel">
-                        <div class="input-group">
-                            <label for="esp32Ip">Dirección IP del ESP32:</label>
-                            <input type="text" id="esp32Ip" placeholder="192.168.1.100" value="192.168.1.100">
-                        </div>
-                        <button class="btn btn-primary" onclick="connectToESP32()">Conectar</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section">
-                <h2>⏰ Configurar Horarios</h2>
-                <div id="scheduleList">
-                    <!-- Los horarios se cargarán aquí -->
-                </div>
-                <button class="btn btn-success" onclick="addSchedule()">➕ Agregar Horario</button>
-            </div>
-
-            <div class="section">
-                <h2>🎛️ Control Manual</h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    <button class="btn btn-test" onclick="testBell('continuo', '1')" style="margin: 0;">🔔 Probar Timbre 1 (Continuo)</button>
-                    <button class="btn btn-test" onclick="testBell('continuo', '2')" style="margin: 0;">🔔 Probar Timbre 2 (Continuo)</button>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    <button class="btn btn-test" onclick="testBell('intermitente', '1')" style="margin: 0;">🔔💤🔔 Timbre 1 (Intermitente)</button>
-                    <button class="btn btn-test" onclick="testBell('intermitente', '2')" style="margin: 0;">🔔💤🔔 Timbre 2 (Intermitente)</button>
-                </div>
-                <div style="margin-bottom: 20px;">
-                    <button class="btn btn-test" onclick="testBell('continuo', 'both')" style="margin: 0; width: 100%;">🔔🔔 Probar AMBOS Timbres (Continuo)</button>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <button class="btn btn-warning" onclick="syncTime()">🕐 Sincronizar Hora</button>
-                    <button class="btn btn-primary" onclick="sendSchedulesToESP32()">📤 Enviar Configuración</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let schedules = [];
-        let esp32Ip = '192.168.1.100';
-        let isConnected = false;
-
-        // Actualizar hora actual
-        function updateCurrentTime() {
-            const now = new Date();
-            document.getElementById('currentTime').textContent = now.toLocaleTimeString();
-            document.getElementById('currentDate').textContent = now.toLocaleDateString();
-        }
-
-        setInterval(updateCurrentTime, 1000);
-        updateCurrentTime();
-
-        // Conectar al ESP32
-        async function connectToESP32() {
-            esp32Ip = document.getElementById('esp32Ip').value;
+void setupWebServer() {
+  // Permitir CORS para la app web
+  server.onNotFound([]() {
+    if (server.method() == HTTP_OPTIONS) {
+      server.sendHeader("Access-Control-Allow-Origin", "*");
+      server.sendHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+      server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+      server.send(200);
+    } else {
+      server.send(404, "text/plain", "Endpoint no encontrado");
+    }
+  });
+  
+  // Estado del sistema
+  server.on("/status", HTTP_GET, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    
+    DynamicJsonDocument doc(1024);
+    doc["status"] = "ok";
+    doc["wifi_connected"] = WiFi.status() == WL_CONNECTED;
+    doc["ip"] = WiFi.localIP().toString();
+    doc["schedule_count"] = scheduleCount;
+    doc["timbre_active"] = timbreActive;
+    
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      char timeStr[64];
+      strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
+      doc["current_time"] = timeStr;
+    }
+    
+    String response;
+    serializeJson(doc, response);
+    server.send(200, "application/json", response);
+  });
+  
+  // Obtener horarios
+  server.on("/schedules", HTTP_GET, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    
+    DynamicJsonDocument doc(2048);
+    JsonArray schedulesArray = doc.createNestedArray("schedules");
+    
+    for (int i = 0; i < scheduleCount; i++) {
+      JsonObject scheduleObj = schedulesArray.createNestedObject();
+      scheduleObj["id"] = schedules[i].id;
+      scheduleObj["name"] = schedules[i].name;
+      
+      char timeStr[6];
+      sprintf(timeStr, "%02d:%02d", schedules[i].hour, schedules[i].minute);
+      scheduleObj["time"] = timeStr;
+      
+      scheduleObj["duration"] = schedules[i].duration;
+      scheduleObj["type"] = schedules[i].type;
+      scheduleObj["relay"] = schedules[i].relay;
+      scheduleObj["enabled"] = schedules[i].enabled;
+    }
+    
+    String response;
+    serializeJson(doc, response);
+    server.send(200, "application/json", response);
+  });
+  
+  // Recibir horarios
+  server.on("/schedules", HTTP_POST, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    
+    if (server.hasArg("plain")) {
+      DynamicJsonDocument doc(2048);
+      deserializeJson(doc, server.arg("plain"));
+      
+      if (doc.containsKey("schedules")) {
+        scheduleCount = 0;
+        JsonArray schedulesArray = doc["schedules"];
+        
+        for (JsonObject scheduleObj : schedulesArray) {
+          if (scheduleCount < 10) {
+            schedules[scheduleCount].id = scheduleObj["id"];
+            schedules[scheduleCount].name = scheduleObj["name"];
             
-            try {
-                const response = await fetch(`http://${esp32Ip}/status`);
-                if (response.ok) {
-                    isConnected = true;
-                    updateConnectionStatus();
-                    showAlert('Conectado exitosamente al ESP32', 'success');
-                    loadSchedulesFromESP32();
-                } else {
-                    throw new Error('No se pudo conectar');
-                }
-            } catch (error) {
-                isConnected = false;
-                updateConnectionStatus();
-                showAlert('Error de conexión: Verifique la IP y que el ESP32 esté encendido', 'error');
-            }
-        }
-
-        // Actualizar estado de conexión
-        function updateConnectionStatus() {
-            const light = document.getElementById('connectionLight');
-            const status = document.getElementById('connectionStatus');
+            // Parsear hora
+            String timeStr = scheduleObj["time"];
+            int colonPos = timeStr.indexOf(':');
+            schedules[scheduleCount].hour = timeStr.substring(0, colonPos).toInt();
+            schedules[scheduleCount].minute = timeStr.substring(colonPos + 1).toInt();
             
-            if (isConnected) {
-                light.classList.add('connected');
-                status.textContent = 'Conectado';
-            } else {
-                light.classList.remove('connected');
-                status.textContent = 'Desconectado';
-            }
+            schedules[scheduleCount].duration = scheduleObj["duration"];
+            schedules[scheduleCount].type = scheduleObj.containsKey("type") ? scheduleObj["type"].as<String>() : "continuo";
+            schedules[scheduleCount].relay = scheduleObj.containsKey("relay") ? scheduleObj["relay"].as<String>() : "1";
+            schedules[scheduleCount].enabled = scheduleObj["enabled"];
+            scheduleCount++;
+          }
         }
+        
+        saveSchedules();
+        Serial.printf("Horarios actualizados: %d configurados\n", scheduleCount);
+        
+        server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Horarios guardados\"}");
+      } else {
+        server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Formato inválido\"}");
+      }
+    } else {
+      server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"No hay datos\"}");
+    }
+  });
+  
+  // Probar timbre
+  server.on("/test-bell", HTTP_POST, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    
+    String type = "continuo";
+    String relay = "1";
+    int duration = 3;
+    
+    if (server.hasArg("plain")) {
+      DynamicJsonDocument doc(512);
+      deserializeJson(doc, server.arg("plain"));
+      
+      if (doc.containsKey("type")) {
+        type = doc["type"].as<String>();
+      }
+      if (doc.containsKey("relay")) {
+        relay = doc["relay"].as<String>();
+      }
+      if (doc.containsKey("duration")) {
+        duration = doc["duration"];
+      }
+    }
+    
+    Serial.printf("Prueba de timbre %s en relé %s activada desde la app\n", type.c_str(), relay.c_str());
+    activateBell(duration, type, relay);
+    
+    server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Timbre activado\"}");
+  });
+  
+  // Sincronizar tiempo
+  server.on("/sync-time", HTTP_POST, []() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    
+    if (server.hasArg("plain")) {
+      DynamicJsonDocument doc(512);
+      deserializeJson(doc, server.arg("plain"));
+      
+      if (doc.containsKey("year") && doc.containsKey("month") && doc.containsKey("day") &&
+          doc.containsKey("hour") && doc.containsKey("minute") && doc.containsKey("second")) {
+        
+        struct tm timeinfo;
+        timeinfo.tm_year = doc["year"] - 1900;
+        timeinfo.tm_mon = doc["month"] - 1;
+        timeinfo.tm_mday = doc["day"];
+        timeinfo.tm_hour = doc["hour"];
+        timeinfo.tm_min = doc["minute"];
+        timeinfo.tm_sec = doc["second"];
+        
+        time_t t = mktime(&timeinfo);
+        struct timeval tv = { .tv_sec = t };
+        settimeofday(&tv, NULL);
+        
+        Serial.println("Tiempo sincronizado manualmente");
+        server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"Tiempo sincronizado\"}");
+      } else {
+        server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Datos de tiempo incompletos\"}");
+      }
+    } else {
+      server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"No hay datos\"}");
+    }
+  });
+}
 
-        // Mostrar alertas
-        function showAlert(message, type) {
-            const alert = document.getElementById(type === 'success' ? 'successAlert' : 'errorAlert');
-            alert.textContent = message;
-            alert.style.display = 'block';
-            
-            setTimeout(() => {
-                alert.style.display = 'none';
-            }, 5000);
-        }
+void checkSchedules() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    return;  // No hay tiempo válido
+  }
+  
+  int currentHour = timeinfo.tm_hour;
+  int currentMinute = timeinfo.tm_min;
+  int currentSecond = timeinfo.tm_sec;
+  
+  // Solo verificar en el segundo 0 para evitar activaciones múltiples
+  if (currentSecond != 0) {
+    return;
+  }
+  
+  for (int i = 0; i < scheduleCount; i++) {
+    if (schedules[i].enabled && 
+        schedules[i].hour == currentHour && 
+        schedules[i].minute == currentMinute) {
+      
+      Serial.printf("Activando timbre %s en relé %s: %s (%02d:%02d)\n", 
+                    schedules[i].type.c_str(), schedules[i].relay.c_str(), schedules[i].name.c_str(), currentHour, currentMinute);
+      
+      activateBell(schedules[i].duration, schedules[i].type, schedules[i].relay);
+      break;  // Solo uno a la vez
+    }
+  }
+}
 
-        // Agregar nuevo horario
-        function addSchedule() {
-            const schedule = {
-                id: Date.now(),
-                name: 'Nuevo Horario',
-                time: '08:00',
-                duration: 3,
-                type: 'continuo',
-                relay: '1',
-                enabled: true
-            };
-            
-            schedules.push(schedule);
-            renderSchedules();
-        }
+void activateBell(int duration, String type = "continuo", String relay = "1") {
+  if (timbreActive) {
+    return;  // Ya está activo
+  }
+  
+  timbreActive = true;
+  currentTimbreDuration = duration;
+  currentTimbreType = type;
+  currentTimbreRelay = relay;
+  timbreStartTime = millis();
+  
+  if (type == "intermitente") {
+    // Para timbre intermitente, inicializamos el estado
+    intermittentState = false;  // Empezamos con la primera parte
+    intermittentStateTime = millis();
+  }
+  
+  // Activar relé(s) según configuración
+  activateRelays(relay, true);
+  digitalWrite(LED_PIN, HIGH);    // Indicador LED
+  
+  Serial.printf("Timbre %s en relé %s activado por %d segundos\n", type.c_str(), relay.c_str(), duration);
+}
 
-        // Renderizar lista de horarios
-        function renderSchedules() {
-            const container = document.getElementById('scheduleList');
-            container.innerHTML = '';
+void handleIntermittentBell(unsigned long currentTime) {
+  unsigned long elapsed = currentTime - intermittentStateTime;
+  int halfDuration = (currentTimbreDuration * 1000) / 2;  // Duración de cada "piii"
+  int pauseDuration = 300;  // Pausa de 300ms entre los dos "piii"
+  
+  if (!intermittentState) {
+    // Primera parte del timbre
+    if (elapsed >= halfDuration) {
+      // Termina primera parte, comienza pausa
+      activateRelays(currentTimbreRelay, false);
+      digitalWrite(LED_PIN, LOW);
+      intermittentState = true;
+      intermittentStateTime = currentTime;
+    }
+  } else {
+    // En pausa o segunda parte
+    if (elapsed >= pauseDuration && elapsed < (pauseDuration + halfDuration)) {
+      // Durante la segunda parte - activar relé
+      activateRelays(currentTimbreRelay, true);
+      digitalWrite(LED_PIN, HIGH);
+    } else if (elapsed >= (pauseDuration + halfDuration)) {
+      // Terminar completamente
+      stopBell();
+    }
+  }
+}
 
-            schedules.forEach(schedule => {
-                const div = document.createElement('div');
-                div.className = 'schedule-item';
-                div.innerHTML = `
-                    <div class="schedule-controls">
-                        <div class="input-group">
-                            <label>Nombre:</label>
-                            <input type="text" value="${schedule.name}" onchange="updateSchedule(${schedule.id}, 'name', this.value)">
-                        </div>
-                        <div class="input-group">
-                            <label>Hora:</label>
-                            <input type="time" value="${schedule.time}" onchange="updateSchedule(${schedule.id}, 'time', this.value)">
-                        </div>
-                        <div class="input-group">
-                            <label>Duración (seg):</label>
-                            <input type="number" min="1" max="30" value="${schedule.duration}" onchange="updateSchedule(${schedule.id}, 'duration', this.value)">
-                        </div>
-                        <div class="input-group">
-                            <label>Tipo de Timbre:</label>
-                            <select onchange="updateSchedule(${schedule.id}, 'type', this.value)">
-                                <option value="continuo" ${schedule.type === 'continuo' ? 'selected' : ''}>🔔 Continuo</option>
-                                <option value="intermitente" ${schedule.type === 'intermitente' ? 'selected' : ''}>🔔💤🔔 Intermitente</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label>Relé(s) a Activar:</label>
-                            <select onchange="updateSchedule(${schedule.id}, 'relay', this.value)">
-                                <option value="1" ${schedule.relay === '1' ? 'selected' : ''}>🔔 Timbre 1</option>
-                                <option value="2" ${schedule.relay === '2' ? 'selected' : ''}>🔔 Timbre 2</option>
-                                <option value="both" ${schedule.relay === 'both' ? 'selected' : ''}>🔔🔔 Ambos Timbres</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label>Activo:</label>
-                            <input type="checkbox" ${schedule.enabled ? 'checked' : ''} onchange="updateSchedule(${schedule.id}, 'enabled', this.checked)" style="width: auto; margin: 10px 0;">
-                            <button class="btn btn-danger" onclick="deleteSchedule(${schedule.id})">🗑️</button>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-        }
+void activateRelays(String relay, bool state) {
+  if (relay == "1") {
+    digitalWrite(RELAY_PIN_1, state ? HIGH : LOW);
+  } else if (relay == "2") {
+    digitalWrite(RELAY_PIN_2, state ? HIGH : LOW);
+  } else if (relay == "both") {
+    digitalWrite(RELAY_PIN_1, state ? HIGH : LOW);
+    digitalWrite(RELAY_PIN_2, state ? HIGH : LOW);
+  }
+}
 
-        // Actualizar horario
-        function updateSchedule(id, field, value) {
-            const schedule = schedules.find(s => s.id === id);
-            if (schedule) {
-                schedule[field] = field === 'duration' ? parseInt(value) : value;
-            }
-        }
+void stopBell() {
+  timbreActive = false;
+  intermittentState = false;
+  
+  // Desactivar ambos relés y LED
+  digitalWrite(RELAY_PIN_1, LOW);
+  digitalWrite(RELAY_PIN_2, LOW);
+  digitalWrite(LED_PIN, LOW);
+  
+  Serial.println("Timbre desactivado");
+}
 
-        // Eliminar horario
-        function deleteSchedule(id) {
-            schedules = schedules.filter(s => s.id !== id);
-            renderSchedules();
-        }
+void saveSchedules() {
+  preferences.putInt("count", scheduleCount);
+  
+  for (int i = 0; i < scheduleCount; i++) {
+    String prefix = "sch_" + String(i) + "_";
+    preferences.putInt((prefix + "id").c_str(), schedules[i].id);
+    preferences.putString((prefix + "name").c_str(), schedules[i].name);
+    preferences.putInt((prefix + "hour").c_str(), schedules[i].hour);
+    preferences.putInt((prefix + "min").c_str(), schedules[i].minute);
+    preferences.putInt((prefix + "dur").c_str(), schedules[i].duration);
+    preferences.putString((prefix + "type").c_str(), schedules[i].type);
+    preferences.putString((prefix + "relay").c_str(), schedules[i].relay);
+    preferences.putBool((prefix + "en").c_str(), schedules[i].enabled);
+  }
+  
+  Serial.println("Horarios guardados en memoria persistente");
+}
 
-        // Probar timbre
-        async function testBell(type = 'continuo', relay = '1') {
-            if (!isConnected) {
-                showAlert('Primero conecte al ESP32', 'error');
-                return;
-            }
-
-            try {
-                const response = await fetch(`http://${esp32Ip}/test-bell`, { 
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: type, duration: 3, relay: relay })
-                });
-                
-                if (response.ok) {
-                    const typeText = type === 'continuo' ? 'continuo' : 'intermitente';
-                    const relayText = relay === '1' ? 'Timbre 1' : relay === '2' ? 'Timbre 2' : 'Ambos Timbres';
-                    showAlert(`${relayText} ${typeText} activado por 3 segundos`, 'success');
-                } else {
-                    throw new Error('Error al activar timbre');
-                }
-            } catch (error) {
-                showAlert('Error al probar el timbre', 'error');
-            }
-        }
-
-        // Sincronizar hora
-        async function syncTime() {
-            if (!isConnected) {
-                showAlert('Primero conecte al ESP32', 'error');
-                return;
-            }
-
-            try {
-                const now = new Date();
-                const timeData = {
-                    year: now.getFullYear(),
-                    month: now.getMonth() + 1,
-                    day: now.getDate(),
-                    hour: now.getHours(),
-                    minute: now.getMinutes(),
-                    second: now.getSeconds()
-                };
-
-                const response = await fetch(`http://${esp32Ip}/sync-time`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(timeData)
-                });
-
-                if (response.ok) {
-                    showAlert('Hora sincronizada correctamente', 'success');
-                } else {
-                    throw new Error('Error al sincronizar');
-                }
-            } catch (error) {
-                showAlert('Error al sincronizar la hora', 'error');
-            }
-        }
-
-        // Enviar horarios al ESP32
-        async function sendSchedulesToESP32() {
-            if (!isConnected) {
-                showAlert('Primero conecte al ESP32', 'error');
-                return;
-            }
-
-            try {
-                const response = await fetch(`http://${esp32Ip}/schedules`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ schedules })
-                });
-
-                if (response.ok) {
-                    showAlert(`Configuración enviada: ${schedules.length} horarios`, 'success');
-                } else {
-                    throw new Error('Error al enviar configuración');
-                }
-            } catch (error) {
-                showAlert('Error al enviar la configuración', 'error');
-            }
-        }
-
-        // Cargar horarios desde ESP32
-        async function loadSchedulesFromESP32() {
-            try {
-                const response = await fetch(`http://${esp32Ip}/schedules`);
-                if (response.ok) {
-                    const data = await response.json();
-                    schedules = data.schedules || [];
-                    renderSchedules();
-                }
-            } catch (error) {
-                console.error('Error cargando horarios:', error);
-            }
-        }
-
-        // Cargar horarios de ejemplo al inicio
-        schedules = [
-            { id: 1, name: 'Entrada Mañana', time: '07:00', duration: 5, type: 'continuo', relay: 'both', enabled: true },
-            { id: 2, name: 'Descanso Mañana', time: '09:30', duration: 3, type: 'intermitente', relay: '1', enabled: true },
-            { id: 3, name: 'Almuerzo', time: '12:00', duration: 5, type: 'continuo', relay: 'both', enabled: true },
-            { id: 4, name: 'Descanso Tarde', time: '15:30', duration: 3, type: 'intermitente', relay: '2', enabled: true },
-            { id: 5, name: 'Fin Jornada', time: '17:00', duration: 5, type: 'continuo', relay: 'both', enabled: true }
-        ];
-
-        renderSchedules();
-    </script>
-</body>
-</html>
+void loadSchedules() {
+  scheduleCount = preferences.getInt("count", 0);
+  
+  for (int i = 0; i < scheduleCount && i < 10; i++) {
+    String prefix = "sch_" + String(i) + "_";
+    schedules[i].id = preferences.getInt((prefix + "id").c_str(), 0);
+    schedules[i].name = preferences.getString((prefix + "name").c_str(), "Horario " + String(i+1));
+    schedules[i].hour = preferences.getInt((prefix + "hour").c_str(), 8);
+    schedules[i].minute = preferences.getInt((prefix + "min").c_str(), 0);
+    schedules[i].duration = preferences.getInt((prefix + "dur").c_str(), 3);
+    schedules[i].type = preferences.getString((prefix + "type").c_str(), "continuo");
+    schedules[i].relay = preferences.getString((prefix + "relay").c_str(), "1");
+    schedules[i].enabled = preferences.getBool((prefix + "en").c_str(), true);
+  }
+  
+  Serial.printf("Horarios cargados: %d configurados\n", scheduleCount);
+}
