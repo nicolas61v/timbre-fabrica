@@ -130,7 +130,7 @@
 
         .schedule-controls {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr auto;
+            grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
             gap: 15px;
             align-items: end;
         }
@@ -282,9 +282,16 @@
 
             <div class="section">
                 <h2>🎛️ Control Manual</h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-                    <button class="btn btn-test" onclick="testBell('continuo')" style="margin: 0;">🔔 Probar Continuo (3s)</button>
-                    <button class="btn btn-test" onclick="testBell('intermitente')" style="margin: 0;">🔔💤🔔 Probar Intermitente</button>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <button class="btn btn-test" onclick="testBell('continuo', '1')" style="margin: 0;">🔔 Probar Timbre 1 (Continuo)</button>
+                    <button class="btn btn-test" onclick="testBell('continuo', '2')" style="margin: 0;">🔔 Probar Timbre 2 (Continuo)</button>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <button class="btn btn-test" onclick="testBell('intermitente', '1')" style="margin: 0;">🔔💤🔔 Timbre 1 (Intermitente)</button>
+                    <button class="btn btn-test" onclick="testBell('intermitente', '2')" style="margin: 0;">🔔💤🔔 Timbre 2 (Intermitente)</button>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-test" onclick="testBell('continuo', 'both')" style="margin: 0; width: 100%;">🔔🔔 Probar AMBOS Timbres (Continuo)</button>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <button class="btn btn-warning" onclick="syncTime()">🕐 Sincronizar Hora</button>
@@ -363,6 +370,7 @@
                 time: '08:00',
                 duration: 3,
                 type: 'continuo',
+                relay: '1',
                 enabled: true
             };
             
@@ -400,6 +408,14 @@
                             </select>
                         </div>
                         <div class="input-group">
+                            <label>Relé(s) a Activar:</label>
+                            <select onchange="updateSchedule(${schedule.id}, 'relay', this.value)">
+                                <option value="1" ${schedule.relay === '1' ? 'selected' : ''}>🔔 Timbre 1</option>
+                                <option value="2" ${schedule.relay === '2' ? 'selected' : ''}>🔔 Timbre 2</option>
+                                <option value="both" ${schedule.relay === 'both' ? 'selected' : ''}>🔔🔔 Ambos Timbres</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
                             <label>Activo:</label>
                             <input type="checkbox" ${schedule.enabled ? 'checked' : ''} onchange="updateSchedule(${schedule.id}, 'enabled', this.checked)" style="width: auto; margin: 10px 0;">
                             <button class="btn btn-danger" onclick="deleteSchedule(${schedule.id})">🗑️</button>
@@ -425,7 +441,7 @@
         }
 
         // Probar timbre
-        async function testBell(type = 'continuo') {
+        async function testBell(type = 'continuo', relay = '1') {
             if (!isConnected) {
                 showAlert('Primero conecte al ESP32', 'error');
                 return;
@@ -435,12 +451,13 @@
                 const response = await fetch(`http://${esp32Ip}/test-bell`, { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: type, duration: 3 })
+                    body: JSON.stringify({ type: type, duration: 3, relay: relay })
                 });
                 
                 if (response.ok) {
-                    const typeText = type === 'continuo' ? 'continuo' : 'intermitente (piii-pausa-piii)';
-                    showAlert(`Timbre ${typeText} activado por 3 segundos`, 'success');
+                    const typeText = type === 'continuo' ? 'continuo' : 'intermitente';
+                    const relayText = relay === '1' ? 'Timbre 1' : relay === '2' ? 'Timbre 2' : 'Ambos Timbres';
+                    showAlert(`${relayText} ${typeText} activado por 3 segundos`, 'success');
                 } else {
                     throw new Error('Error al activar timbre');
                 }
@@ -523,11 +540,11 @@
 
         // Cargar horarios de ejemplo al inicio
         schedules = [
-            { id: 1, name: 'Entrada Mañana', time: '07:00', duration: 5, type: 'continuo', enabled: true },
-            { id: 2, name: 'Descanso Mañana', time: '09:30', duration: 3, type: 'intermitente', enabled: true },
-            { id: 3, name: 'Almuerzo', time: '12:00', duration: 5, type: 'continuo', enabled: true },
-            { id: 4, name: 'Descanso Tarde', time: '15:30', duration: 3, type: 'intermitente', enabled: true },
-            { id: 5, name: 'Fin Jornada', time: '17:00', duration: 5, type: 'continuo', enabled: true }
+            { id: 1, name: 'Entrada Mañana', time: '07:00', duration: 5, type: 'continuo', relay: 'both', enabled: true },
+            { id: 2, name: 'Descanso Mañana', time: '09:30', duration: 3, type: 'intermitente', relay: '1', enabled: true },
+            { id: 3, name: 'Almuerzo', time: '12:00', duration: 5, type: 'continuo', relay: 'both', enabled: true },
+            { id: 4, name: 'Descanso Tarde', time: '15:30', duration: 3, type: 'intermitente', relay: '2', enabled: true },
+            { id: 5, name: 'Fin Jornada', time: '17:00', duration: 5, type: 'continuo', relay: 'both', enabled: true }
         ];
 
         renderSchedules();
