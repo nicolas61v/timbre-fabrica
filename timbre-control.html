@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Timbre - Fábrica</title>
+    <title>Sistema de Control de Timbre Industrial</title>
     <style>
         * {
             margin: 0;
@@ -12,50 +12,57 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             min-height: 100vh;
             padding: 20px;
+            color: #2c3e50;
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             overflow: hidden;
         }
 
         .header {
-            background: linear-gradient(135deg, #2c3e50, #34495e);
+            background: linear-gradient(135deg, #2c3e50, #3498db);
             color: white;
-            padding: 30px;
+            padding: 40px 30px;
             text-align: center;
         }
 
         .header h1 {
-            font-size: 2rem;
-            margin-bottom: 10px;
+            font-size: 2.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
         }
 
-        .status {
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .status-bar {
             background: #ecf0f1;
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
+            padding: 20px 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            border-bottom: 1px solid #bdc3c7;
         }
 
         .status-item {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            font-weight: 500;
         }
 
-        .status-light {
+        .status-indicator {
             width: 12px;
             height: 12px;
             border-radius: 50%;
@@ -63,14 +70,13 @@
             animation: pulse 2s infinite;
         }
 
-        .status-light.connected {
+        .status-indicator.connected {
             background: #27ae60;
         }
 
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
         }
 
         .main-content {
@@ -78,78 +84,115 @@
         }
 
         .section {
-            margin-bottom: 30px;
+            margin-bottom: 40px;
         }
 
-        .section h2 {
+        .section-title {
+            font-size: 1.4rem;
+            font-weight: 600;
             color: #2c3e50;
-            margin-bottom: 15px;
-            padding-bottom: 8px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
             border-bottom: 2px solid #3498db;
         }
 
-        .esp32-config {
+        .connection-panel {
             background: #f8f9fa;
-            padding: 20px;
+            padding: 25px;
             border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+
+        .form-group {
             margin-bottom: 20px;
         }
 
-        .input-group {
-            margin-bottom: 15px;
-        }
-
-        label {
+        .form-label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             font-weight: 600;
             color: #2c3e50;
+            font-size: 0.95rem;
         }
 
-        input, select {
+        .form-input, .form-select {
             width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
             border-radius: 6px;
             font-size: 16px;
-            transition: border-color 0.3s;
+            transition: all 0.3s ease;
+            background: white;
         }
 
-        input:focus, select:focus {
+        .form-input:focus, .form-select:focus {
             outline: none;
             border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
         }
 
         .schedule-item {
-            background: #f8f9fa;
-            padding: 20px;
-            margin-bottom: 15px;
+            background: white;
+            padding: 25px;
+            margin-bottom: 20px;
             border-radius: 8px;
-            border-left: 4px solid #3498db;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }
 
         .schedule-controls {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
+            grid-template-columns: 2fr 1fr 1fr 1.5fr 1fr auto;
             gap: 15px;
             align-items: end;
+        }
+
+        @media (max-width: 1024px) {
+            .schedule-controls {
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+            }
         }
 
         @media (max-width: 768px) {
             .schedule-controls {
                 grid-template-columns: 1fr;
-                gap: 10px;
+                gap: 15px;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .header {
+                padding: 30px 20px;
+            }
+            
+            .status-bar {
+                padding: 15px 20px;
+                grid-template-columns: 1fr;
             }
         }
 
         .btn {
-            padding: 12px 24px;
+            padding: 12px 20px;
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
+            text-align: center;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
 
         .btn-primary {
@@ -159,7 +202,6 @@
 
         .btn-primary:hover {
             background: #2980b9;
-            transform: translateY(-2px);
         }
 
         .btn-success {
@@ -189,47 +231,151 @@
             background: #c0392b;
         }
 
-        .btn-test {
-            background: #9b59b6;
+        .btn-secondary {
+            background: #95a5a6;
             color: white;
-            width: 100%;
-            margin: 20px 0;
-            padding: 15px;
-            font-size: 18px;
         }
 
-        .btn-test:hover {
-            background: #8e44ad;
+        .btn-secondary:hover {
+            background: #7f8c8d;
         }
 
-        .alert {
-            padding: 15px;
-            border-radius: 6px;
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
             margin-bottom: 20px;
+        }
+
+        .control-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .control-section h3 {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        /* Modal Styles */
+        .modal {
             display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s ease;
         }
 
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+        .modal-content {
+            background: white;
+            margin: auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease;
         }
 
-        .connection-panel {
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .modal-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #7f8c8d;
+            padding: 5px;
+        }
+
+        .modal-close:hover {
+            color: #2c3e50;
+        }
+
+        .modal-body {
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .connection-form {
             display: grid;
             grid-template-columns: 1fr auto;
             gap: 15px;
             align-items: end;
         }
 
-        @media (max-width: 480px) {
-            .connection-panel {
+        @media (max-width: 600px) {
+            .connection-form {
                 grid-template-columns: 1fr;
             }
         }
@@ -238,65 +384,89 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏭 Control de Timbre</h1>
-            <p>Sistema de Control para Fábrica de Galvanizado</p>
+            <h1>Sistema de Control de Timbre Industrial</h1>
+            <p>Plataforma de Gestión para Fábrica de Galvanizado</p>
         </div>
 
-        <div class="status">
+        <div class="status-bar">
             <div class="status-item">
-                <div class="status-light" id="connectionLight"></div>
+                <div class="status-indicator" id="connectionIndicator"></div>
                 <span>ESP32: <span id="connectionStatus">Desconectado</span></span>
             </div>
             <div class="status-item">
-                <span>⏰ <span id="currentTime">--:--:--</span></span>
+                <span>Hora Actual: <span id="currentTime">--:--:--</span></span>
             </div>
             <div class="status-item">
-                <span>📅 <span id="currentDate">----/--/--</span></span>
+                <span>Fecha: <span id="currentDate">----/--/--</span></span>
             </div>
         </div>
 
         <div class="main-content">
-            <div class="alert alert-success" id="successAlert"></div>
-            <div class="alert alert-error" id="errorAlert"></div>
-
             <div class="section">
-                <h2>🔗 Conexión ESP32</h2>
-                <div class="esp32-config">
-                    <div class="connection-panel">
-                        <div class="input-group">
-                            <label for="esp32Ip">Dirección IP del ESP32:</label>
-                            <input type="text" id="esp32Ip" placeholder="192.168.1.100" value="192.168.1.100">
+                <h2 class="section-title">Conexión al Sistema</h2>
+                <div class="connection-panel">
+                    <div class="connection-form">
+                        <div class="form-group">
+                            <label class="form-label" for="esp32Ip">Dirección IP del ESP32:</label>
+                            <input type="text" id="esp32Ip" class="form-input" placeholder="192.168.1.100" value="192.168.1.100" onchange="esp32Ip = this.value; saveToLocalStorage();">
                         </div>
-                        <button class="btn btn-primary" onclick="connectToESP32()">Conectar</button>
+                        <button class="btn btn-primary" onclick="connectToESP32()">
+                            <span id="connectText">Conectar</span>
+                            <div id="connectSpinner" class="loading-spinner" style="display:none; margin-left: 8px;"></div>
+                        </button>
                     </div>
                 </div>
             </div>
 
             <div class="section">
-                <h2>⏰ Configurar Horarios</h2>
+                <h2 class="section-title">Configuración de Horarios</h2>
                 <div id="scheduleList">
                     <!-- Los horarios se cargarán aquí -->
                 </div>
-                <button class="btn btn-success" onclick="addSchedule()">➕ Agregar Horario</button>
+                <button class="btn btn-success" onclick="addSchedule()">Agregar Nuevo Horario</button>
             </div>
 
             <div class="section">
-                <h2>🎛️ Control Manual</h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    <button class="btn btn-test" onclick="testBell('continuo', '1')" style="margin: 0;">🔔 Probar Timbre 1 (Continuo)</button>
-                    <button class="btn btn-test" onclick="testBell('continuo', '2')" style="margin: 0;">🔔 Probar Timbre 2 (Continuo)</button>
+                <h2 class="section-title">Panel de Control Manual</h2>
+                <div class="control-grid">
+                    <div class="control-section">
+                        <h3>Pruebas Individuales - Timbre 1</h3>
+                        <button class="btn btn-secondary" onclick="testBell('continuo', '1')" style="width: 100%; margin-bottom: 8px;">Continuo</button>
+                        <button class="btn btn-secondary" onclick="testBell('intermitente', '1')" style="width: 100%; margin-bottom: 8px;">Intermitente (2x)</button>
+                        <button class="btn btn-secondary" onclick="testBell('triple', '1')" style="width: 100%;">Triple (3x)</button>
+                    </div>
+                    
+                    <div class="control-section">
+                        <h3>Pruebas Individuales - Timbre 2</h3>
+                        <button class="btn btn-secondary" onclick="testBell('continuo', '2')" style="width: 100%; margin-bottom: 8px;">Continuo</button>
+                        <button class="btn btn-secondary" onclick="testBell('intermitente', '2')" style="width: 100%; margin-bottom: 8px;">Intermitente (2x)</button>
+                        <button class="btn btn-secondary" onclick="testBell('triple', '2')" style="width: 100%;">Triple (3x)</button>
+                    </div>
+                    
+                    <div class="control-section">
+                        <h3>Pruebas Combinadas</h3>
+                        <button class="btn btn-primary" onclick="testBell('continuo', 'both')" style="width: 100%; margin-bottom: 8px;">Ambos Timbres</button>
+                        <button class="btn btn-warning" onclick="syncTime()" style="width: 100%; margin-bottom: 8px;">Sincronizar Hora</button>
+                        <button class="btn btn-success" onclick="sendSchedulesToESP32()" style="width: 100%; margin-bottom: 8px;">Enviar Configuración</button>
+                        <button class="btn btn-danger" onclick="clearLocalStorage()" style="width: 100%;">Restablecer Config</button>
+                    </div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    <button class="btn btn-test" onclick="testBell('intermitente', '1')" style="margin: 0;">🔔💤🔔 Timbre 1 (Intermitente)</button>
-                    <button class="btn btn-test" onclick="testBell('intermitente', '2')" style="margin: 0;">🔔💤🔔 Timbre 2 (Intermitente)</button>
-                </div>
-                <div style="margin-bottom: 20px;">
-                    <button class="btn btn-test" onclick="testBell('continuo', 'both')" style="margin: 0; width: 100%;">🔔🔔 Probar AMBOS Timbres (Continuo)</button>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <button class="btn btn-warning" onclick="syncTime()">🕐 Sincronizar Hora</button>
-                    <button class="btn btn-primary" onclick="sendSchedulesToESP32()">📤 Enviar Configuración</button>
-                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Estado -->
+    <div id="statusModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Estado del Sistema</h3>
+                <button class="modal-close" onclick="closeModal('statusModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                Procesando...
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal('statusModal')">Cerrar</button>
             </div>
         </div>
     </div>
@@ -305,6 +475,63 @@
         let schedules = [];
         let esp32Ip = '192.168.1.100';
         let isConnected = false;
+
+        // Funciones de almacenamiento local
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem('timbre_schedules', JSON.stringify(schedules));
+                localStorage.setItem('timbre_esp32_ip', esp32Ip);
+                console.log('Configuración guardada en el navegador');
+            } catch (error) {
+                console.error('Error guardando en localStorage:', error);
+            }
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const savedSchedules = localStorage.getItem('timbre_schedules');
+                const savedIp = localStorage.getItem('timbre_esp32_ip');
+                
+                if (savedSchedules) {
+                    schedules = JSON.parse(savedSchedules);
+                    console.log(`${schedules.length} horarios cargados desde el navegador`);
+                } else {
+                    // Solo usar ejemplos si no hay nada guardado
+                    loadExampleSchedules();
+                }
+                
+                if (savedIp) {
+                    esp32Ip = savedIp;
+                    document.getElementById('esp32Ip').value = savedIp;
+                }
+            } catch (error) {
+                console.error('Error cargando desde localStorage:', error);
+                loadExampleSchedules();
+            }
+        }
+
+        function loadExampleSchedules() {
+            schedules = [
+                { id: 1, name: 'Entrada Turno Mañana', time: '07:00', duration: 5, type: 'continuo', relay: 'both', enabled: true },
+                { id: 2, name: 'Descanso Matutino', time: '09:30', duration: 4, type: 'intermitente', relay: '1', enabled: true },
+                { id: 3, name: 'Hora de Almuerzo', time: '12:00', duration: 5, type: 'continuo', relay: 'both', enabled: true },
+                { id: 4, name: 'Descanso Vespertino', time: '15:30', duration: 4, type: 'intermitente', relay: '2', enabled: true },
+                { id: 5, name: 'Fin de Jornada Laboral', time: '17:00', duration: 6, type: 'triple', relay: 'both', enabled: true }
+            ];
+            console.log('Horarios de ejemplo cargados (primera vez)');
+        }
+
+        function clearLocalStorage() {
+            if (confirm('¿Está seguro de que desea eliminar toda la configuración guardada?')) {
+                localStorage.removeItem('timbre_schedules');
+                localStorage.removeItem('timbre_esp32_ip');
+                loadExampleSchedules();
+                document.getElementById('esp32Ip').value = '192.168.1.100';
+                esp32Ip = '192.168.1.100';
+                renderSchedules();
+                showModal('Configuración Eliminada', 'Se ha eliminado toda la configuración guardada y se han cargado los valores por defecto.', 'success');
+            }
+        }
 
         // Actualizar hora actual
         function updateCurrentTime() {
@@ -316,16 +543,36 @@
         setInterval(updateCurrentTime, 1000);
         updateCurrentTime();
 
+        // Modal functions
+        function showModal(title, message, type = 'info') {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalBody').innerHTML = message;
+            document.getElementById('statusModal').classList.add('show');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+
         // Conectar al ESP32
         async function connectToESP32() {
             esp32Ip = document.getElementById('esp32Ip').value;
+            
+            const connectBtn = document.querySelector('#connectText').parentElement;
+            const connectText = document.getElementById('connectText');
+            const connectSpinner = document.getElementById('connectSpinner');
+            
+            connectText.textContent = 'Conectando...';
+            connectSpinner.style.display = 'inline-block';
+            connectBtn.disabled = true;
             
             try {
                 const response = await fetch(`http://${esp32Ip}/status`);
                 if (response.ok) {
                     isConnected = true;
                     updateConnectionStatus();
-                    showAlert('Conectado exitosamente al ESP32', 'success');
+                    saveToLocalStorage(); // Guardar IP cuando se conecte exitosamente
+                    showModal('Conexión Exitosa', `Conectado correctamente al ESP32 en la dirección ${esp32Ip}`, 'success');
                     loadSchedulesFromESP32();
                 } else {
                     throw new Error('No se pudo conectar');
@@ -333,33 +580,26 @@
             } catch (error) {
                 isConnected = false;
                 updateConnectionStatus();
-                showAlert('Error de conexión: Verifique la IP y que el ESP32 esté encendido', 'error');
+                showModal('Error de Conexión', 'No se pudo conectar al ESP32. Verifique que:<br><br>• La dirección IP sea correcta<br>• El ESP32 esté encendido<br>• Ambos dispositivos estén en la misma red WiFi', 'error');
+            } finally {
+                connectText.textContent = 'Conectar';
+                connectSpinner.style.display = 'none';
+                connectBtn.disabled = false;
             }
         }
 
         // Actualizar estado de conexión
         function updateConnectionStatus() {
-            const light = document.getElementById('connectionLight');
+            const indicator = document.getElementById('connectionIndicator');
             const status = document.getElementById('connectionStatus');
             
             if (isConnected) {
-                light.classList.add('connected');
+                indicator.classList.add('connected');
                 status.textContent = 'Conectado';
             } else {
-                light.classList.remove('connected');
+                indicator.classList.remove('connected');
                 status.textContent = 'Desconectado';
             }
-        }
-
-        // Mostrar alertas
-        function showAlert(message, type) {
-            const alert = document.getElementById(type === 'success' ? 'successAlert' : 'errorAlert');
-            alert.textContent = message;
-            alert.style.display = 'block';
-            
-            setTimeout(() => {
-                alert.style.display = 'none';
-            }, 5000);
         }
 
         // Agregar nuevo horario
@@ -376,6 +616,7 @@
             
             schedules.push(schedule);
             renderSchedules();
+            saveToLocalStorage(); // Guardar automáticamente
         }
 
         // Renderizar lista de horarios
@@ -388,37 +629,40 @@
                 div.className = 'schedule-item';
                 div.innerHTML = `
                     <div class="schedule-controls">
-                        <div class="input-group">
-                            <label>Nombre:</label>
-                            <input type="text" value="${schedule.name}" onchange="updateSchedule(${schedule.id}, 'name', this.value)">
+                        <div class="form-group">
+                            <label class="form-label">Nombre del Horario:</label>
+                            <input type="text" class="form-input" value="${schedule.name}" onchange="updateSchedule(${schedule.id}, 'name', this.value)">
                         </div>
-                        <div class="input-group">
-                            <label>Hora:</label>
-                            <input type="time" value="${schedule.time}" onchange="updateSchedule(${schedule.id}, 'time', this.value)">
+                        <div class="form-group">
+                            <label class="form-label">Hora:</label>
+                            <input type="time" class="form-input" value="${schedule.time}" onchange="updateSchedule(${schedule.id}, 'time', this.value)">
                         </div>
-                        <div class="input-group">
-                            <label>Duración (seg):</label>
-                            <input type="number" min="1" max="30" value="${schedule.duration}" onchange="updateSchedule(${schedule.id}, 'duration', this.value)">
+                        <div class="form-group">
+                            <label class="form-label">Duración (seg):</label>
+                            <input type="number" class="form-input" min="1" max="30" value="${schedule.duration}" onchange="updateSchedule(${schedule.id}, 'duration', this.value)">
                         </div>
-                        <div class="input-group">
-                            <label>Tipo de Timbre:</label>
-                            <select onchange="updateSchedule(${schedule.id}, 'type', this.value)">
-                                <option value="continuo" ${schedule.type === 'continuo' ? 'selected' : ''}>🔔 Continuo</option>
-                                <option value="intermitente" ${schedule.type === 'intermitente' ? 'selected' : ''}>🔔💤🔔 Intermitente</option>
+                        <div class="form-group">
+                            <label class="form-label">Tipo de Timbre:</label>
+                            <select class="form-select" onchange="updateSchedule(${schedule.id}, 'type', this.value)">
+                                <option value="continuo" ${schedule.type === 'continuo' ? 'selected' : ''}>Continuo</option>
+                                <option value="intermitente" ${schedule.type === 'intermitente' ? 'selected' : ''}>Intermitente (2x)</option>
+                                <option value="triple" ${schedule.type === 'triple' ? 'selected' : ''}>Triple (3x)</option>
                             </select>
                         </div>
-                        <div class="input-group">
-                            <label>Relé(s) a Activar:</label>
-                            <select onchange="updateSchedule(${schedule.id}, 'relay', this.value)">
-                                <option value="1" ${schedule.relay === '1' ? 'selected' : ''}>🔔 Timbre 1</option>
-                                <option value="2" ${schedule.relay === '2' ? 'selected' : ''}>🔔 Timbre 2</option>
-                                <option value="both" ${schedule.relay === 'both' ? 'selected' : ''}>🔔🔔 Ambos Timbres</option>
+                        <div class="form-group">
+                            <label class="form-label">Relé(s):</label>
+                            <select class="form-select" onchange="updateSchedule(${schedule.id}, 'relay', this.value)">
+                                <option value="1" ${schedule.relay === '1' ? 'selected' : ''}>Timbre 1</option>
+                                <option value="2" ${schedule.relay === '2' ? 'selected' : ''}>Timbre 2</option>
+                                <option value="both" ${schedule.relay === 'both' ? 'selected' : ''}>Ambos Timbres</option>
                             </select>
                         </div>
-                        <div class="input-group">
-                            <label>Activo:</label>
-                            <input type="checkbox" ${schedule.enabled ? 'checked' : ''} onchange="updateSchedule(${schedule.id}, 'enabled', this.checked)" style="width: auto; margin: 10px 0;">
-                            <button class="btn btn-danger" onclick="deleteSchedule(${schedule.id})">🗑️</button>
+                        <div class="form-group">
+                            <div class="checkbox-container">
+                                <input type="checkbox" ${schedule.enabled ? 'checked' : ''} onchange="updateSchedule(${schedule.id}, 'enabled', this.checked)">
+                                <label class="form-label">Activo</label>
+                            </div>
+                            <button class="btn btn-danger" onclick="deleteSchedule(${schedule.id})" style="margin-top: 10px; width: 100%;">Eliminar</button>
                         </div>
                     </div>
                 `;
@@ -431,21 +675,28 @@
             const schedule = schedules.find(s => s.id === id);
             if (schedule) {
                 schedule[field] = field === 'duration' ? parseInt(value) : value;
+                saveToLocalStorage(); // Guardar automáticamente cuando se modifica
             }
         }
 
         // Eliminar horario
         function deleteSchedule(id) {
-            schedules = schedules.filter(s => s.id !== id);
-            renderSchedules();
+            if (confirm('¿Está seguro de que desea eliminar este horario?')) {
+                schedules = schedules.filter(s => s.id !== id);
+                renderSchedules();
+                saveToLocalStorage(); // Guardar automáticamente cuando se elimina
+            }
         }
 
         // Probar timbre
         async function testBell(type = 'continuo', relay = '1') {
             if (!isConnected) {
-                showAlert('Primero conecte al ESP32', 'error');
+                showModal('Error', 'Debe conectarse al ESP32 antes de realizar pruebas.', 'error');
                 return;
             }
+
+            const relayText = relay === '1' ? 'Timbre 1' : relay === '2' ? 'Timbre 2' : 'Ambos Timbres';
+            const typeText = type === 'continuo' ? 'continuo' : type === 'intermitente' ? 'intermitente (2x)' : 'triple (3x)';
 
             try {
                 const response = await fetch(`http://${esp32Ip}/test-bell`, { 
@@ -455,21 +706,19 @@
                 });
                 
                 if (response.ok) {
-                    const typeText = type === 'continuo' ? 'continuo' : 'intermitente';
-                    const relayText = relay === '1' ? 'Timbre 1' : relay === '2' ? 'Timbre 2' : 'Ambos Timbres';
-                    showAlert(`${relayText} ${typeText} activado por 3 segundos`, 'success');
+                    showModal('Prueba Ejecutada', `${relayText} activado en modo ${typeText} por 3 segundos.`, 'success');
                 } else {
                     throw new Error('Error al activar timbre');
                 }
             } catch (error) {
-                showAlert('Error al probar el timbre', 'error');
+                showModal('Error de Comunicación', 'No se pudo comunicar con el ESP32 para ejecutar la prueba.', 'error');
             }
         }
 
-        // Sincronizar hora
+        // Sincronizar tiempo
         async function syncTime() {
             if (!isConnected) {
-                showAlert('Primero conecte al ESP32', 'error');
+                showModal('Error', 'Debe conectarse al ESP32 antes de sincronizar la hora.', 'error');
                 return;
             }
 
@@ -491,19 +740,24 @@
                 });
 
                 if (response.ok) {
-                    showAlert('Hora sincronizada correctamente', 'success');
+                    showModal('Sincronización Exitosa', 'La hora del ESP32 ha sido sincronizada correctamente con la hora del sistema.', 'success');
                 } else {
                     throw new Error('Error al sincronizar');
                 }
             } catch (error) {
-                showAlert('Error al sincronizar la hora', 'error');
+                showModal('Error de Sincronización', 'No se pudo sincronizar la hora con el ESP32.', 'error');
             }
         }
 
         // Enviar horarios al ESP32
         async function sendSchedulesToESP32() {
             if (!isConnected) {
-                showAlert('Primero conecte al ESP32', 'error');
+                showModal('Error', 'Debe conectarse al ESP32 antes de enviar la configuración.', 'error');
+                return;
+            }
+
+            if (schedules.length === 0) {
+                showModal('Advertencia', 'No hay horarios configurados para enviar.', 'warning');
                 return;
             }
 
@@ -515,12 +769,12 @@
                 });
 
                 if (response.ok) {
-                    showAlert(`Configuración enviada: ${schedules.length} horarios`, 'success');
+                    showModal('Configuración Enviada', `Se han enviado ${schedules.length} horarios al ESP32. La configuración se ha guardado correctamente y estará activa de forma permanente.`, 'success');
                 } else {
                     throw new Error('Error al enviar configuración');
                 }
             } catch (error) {
-                showAlert('Error al enviar la configuración', 'error');
+                showModal('Error de Envío', 'No se pudo enviar la configuración al ESP32. Verifique la conexión.', 'error');
             }
         }
 
@@ -530,23 +784,34 @@
                 const response = await fetch(`http://${esp32Ip}/schedules`);
                 if (response.ok) {
                     const data = await response.json();
-                    schedules = data.schedules || [];
-                    renderSchedules();
+                    if (data.schedules && data.schedules.length > 0) {
+                        schedules = data.schedules;
+                        renderSchedules();
+                        saveToLocalStorage(); // Guardar los horarios cargados del ESP32
+                        showModal('Horarios Sincronizados', `Se han cargado ${schedules.length} horarios desde el ESP32 y se han guardado en el navegador.`, 'success');
+                    }
                 }
             } catch (error) {
                 console.error('Error cargando horarios:', error);
             }
         }
 
-        // Cargar horarios de ejemplo al inicio
-        schedules = [
-            { id: 1, name: 'Entrada Mañana', time: '07:00', duration: 5, type: 'continuo', relay: 'both', enabled: true },
-            { id: 2, name: 'Descanso Mañana', time: '09:30', duration: 3, type: 'intermitente', relay: '1', enabled: true },
-            { id: 3, name: 'Almuerzo', time: '12:00', duration: 5, type: 'continuo', relay: 'both', enabled: true },
-            { id: 4, name: 'Descanso Tarde', time: '15:30', duration: 3, type: 'intermitente', relay: '2', enabled: true },
-            { id: 5, name: 'Fin Jornada', time: '17:00', duration: 5, type: 'continuo', relay: 'both', enabled: true }
-        ];
+        // Cerrar modal al hacer clic fuera de él
+        window.onclick = function(event) {
+            const modal = document.getElementById('statusModal');
+            if (event.target === modal) {
+                closeModal('statusModal');
+            }
+        }
 
+        // Inicializar al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFromLocalStorage();
+            renderSchedules();
+        });
+
+        // Cargar configuración al iniciar
+        loadFromLocalStorage();
         renderSchedules();
     </script>
 </body>
