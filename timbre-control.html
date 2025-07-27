@@ -423,10 +423,17 @@
 
             <div class="section">
                 <h2 class="section-title">Configuración de Horarios</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <div>
+                        <strong>Horarios Configurados: <span id="scheduleCount">0</span>/40</strong>
+                        <br>
+                        <small style="color: #7f8c8d;">Máximo 40 horarios permitidos</small>
+                    </div>
+                    <button class="btn btn-success" onclick="addSchedule()">Agregar Nuevo Horario</button>
+                </div>
                 <div id="scheduleList">
                     <!-- Los horarios se cargarán aquí -->
                 </div>
-                <button class="btn btn-success" onclick="addSchedule()">Agregar Nuevo Horario</button>
             </div>
 
             <div class="section">
@@ -631,6 +638,11 @@
 
         // Agregar nuevo horario
         function addSchedule() {
+            if (schedules.length >= 40) {
+                showModal('Límite Alcanzado', 'No se pueden agregar más de 40 horarios. Elimine algunos horarios existentes si necesita agregar nuevos.', 'error');
+                return;
+            }
+            
             const schedule = {
                 id: Date.now(),
                 name: 'Nuevo Horario',
@@ -651,10 +663,17 @@
             const container = document.getElementById('scheduleList');
             container.innerHTML = '';
 
-            schedules.forEach(schedule => {
+            // Actualizar contador de horarios
+            document.getElementById('scheduleCount').textContent = schedules.length;
+
+            schedules.forEach((schedule, index) => {
                 const div = document.createElement('div');
                 div.className = 'schedule-item';
                 div.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4 style="color: #2c3e50; margin: 0;">Horario ${index + 1}</h4>
+                        <small style="color: #7f8c8d;">ID: ${schedule.id}</small>
+                    </div>
                     <div class="schedule-controls">
                         <div class="form-group">
                             <label class="form-label">Nombre del Horario:</label>
