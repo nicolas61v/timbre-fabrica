@@ -46,6 +46,26 @@
             opacity: 0.9;
         }
 
+        /* Advertencia de conexión */
+        .connection-warning {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            padding: 15px 30px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 1.1rem;
+            animation: pulse-warning 2s infinite;
+        }
+
+        .connection-warning.hidden {
+            display: none;
+        }
+
+        @keyframes pulse-warning {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
         .status-bar {
             background: #ecf0f1;
             padding: 20px 30px;
@@ -139,26 +159,48 @@
             border-radius: 8px;
             border: 1px solid #e9ecef;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            position: relative;
         }
 
-        .schedule-controls {
+        .schedule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .schedule-info {
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1.5fr 1fr auto;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
-            align-items: end;
+            margin-bottom: 15px;
         }
 
-        @media (max-width: 1024px) {
-            .schedule-controls {
-                grid-template-columns: 1fr 1fr;
-                gap: 15px;
-            }
+        .info-item {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 3px solid #3498db;
+        }
+
+        .info-label {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 1rem;
+            color: #2c3e50;
+            font-weight: 500;
         }
 
         @media (max-width: 768px) {
-            .schedule-controls {
+            .schedule-info {
                 grid-template-columns: 1fr;
-                gap: 15px;
             }
             
             .main-content {
@@ -190,7 +232,13 @@
             justify-content: center;
         }
 
-        .btn:hover {
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn:hover:not(:disabled) {
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
@@ -200,7 +248,7 @@
             color: white;
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             background: #2980b9;
         }
 
@@ -209,7 +257,7 @@
             color: white;
         }
 
-        .btn-success:hover {
+        .btn-success:hover:not(:disabled) {
             background: #219a52;
         }
 
@@ -218,7 +266,7 @@
             color: white;
         }
 
-        .btn-warning:hover {
+        .btn-warning:hover:not(:disabled) {
             background: #e67e22;
         }
 
@@ -227,7 +275,7 @@
             color: white;
         }
 
-        .btn-danger:hover {
+        .btn-danger:hover:not(:disabled) {
             background: #c0392b;
         }
 
@@ -236,7 +284,7 @@
             color: white;
         }
 
-        .btn-secondary:hover {
+        .btn-secondary:hover:not(:disabled) {
             background: #7f8c8d;
         }
 
@@ -259,19 +307,6 @@
             margin-bottom: 15px;
             color: #2c3e50;
             font-weight: 600;
-        }
-
-        .checkbox-container {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .checkbox-container input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
         }
 
         /* Modal Styles */
@@ -379,6 +414,33 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        .disabled-overlay {
+            position: relative;
+        }
+
+        .disabled-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 10;
+            border-radius: 8px;
+        }
+
+        .schedule-counter {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
     </style>
 </head>
 <body>
@@ -386,6 +448,11 @@
         <div class="header">
             <h1>Sistema de Control de Timbre Industrial</h1>
             <p>Plataforma de Gestión para Fábrica de Galvanizado</p>
+        </div>
+
+        <!-- Advertencia de conexión -->
+        <div class="connection-warning" id="connectionWarning">
+            ⚠️ IMPORTANTE: Conéctese al ESP32 antes de configurar horarios. Los horarios solo se pueden gestionar cuando esté conectado al sistema.
         </div>
 
         <div class="status-bar">
@@ -406,12 +473,12 @@
 
         <div class="main-content">
             <div class="section">
-                <h2 class="section-title">Conexión al Sistema</h2>
+                <h2 class="section-title">🔗 Conexión al Sistema</h2>
                 <div class="connection-panel">
                     <div class="connection-form">
                         <div class="form-group">
                             <label class="form-label" for="esp32Ip">Dirección IP del ESP32:</label>
-                            <input type="text" id="esp32Ip" class="form-input" placeholder="192.168.1.100" value="192.168.1.100" onchange="esp32Ip = this.value; saveToLocalStorage();">
+                            <input type="text" id="esp32Ip" class="form-input" placeholder="192.168.1.100" value="192.168.1.100">
                         </div>
                         <button class="btn btn-primary" onclick="connectToESP32()">
                             <span id="connectText">Conectar</span>
@@ -421,45 +488,50 @@
                 </div>
             </div>
 
-            <div class="section">
-                <h2 class="section-title">Configuración de Horarios</h2>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <div class="section" id="scheduleSection">
+                <h2 class="section-title">⏰ Configuración de Horarios</h2>
+                <div class="schedule-counter">
                     <div>
                         <strong>Horarios Configurados: <span id="scheduleCount">0</span>/40</strong>
                         <br>
-                        <small style="color: #7f8c8d;">Máximo 40 horarios permitidos</small>
+                        <small style="color: #7f8c8d;">Los horarios se gestionan directamente desde el ESP32</small>
                     </div>
-                    <button class="btn btn-success" onclick="addSchedule()">Agregar Nuevo Horario</button>
+                    <button class="btn btn-success" id="addScheduleBtn" onclick="showAddScheduleModal()" disabled>
+                        Agregar Nuevo Horario
+                    </button>
                 </div>
                 <div id="scheduleList">
-                    <!-- Los horarios se cargarán aquí -->
+                    <div style="text-align: center; padding: 40px; color: #7f8c8d;">
+                        <p style="font-size: 1.2rem; margin-bottom: 10px;">📋</p>
+                        <p>Conéctese al ESP32 para ver y gestionar los horarios programados</p>
+                    </div>
                 </div>
             </div>
 
             <div class="section">
-                <h2 class="section-title">Panel de Control Manual</h2>
+                <h2 class="section-title">🎛️ Panel de Control Manual</h2>
                 <div class="control-grid">
                     <div class="control-section">
                         <h3>Pruebas Individuales - Timbre 1</h3>
-                        <button class="btn btn-secondary" onclick="testBell('continuo', '1')" style="width: 100%; margin-bottom: 8px;">Continuo</button>
-                        <button class="btn btn-secondary" onclick="testBell('intermitente', '1')" style="width: 100%; margin-bottom: 8px;">Intermitente (2x)</button>
-                        <button class="btn btn-secondary" onclick="testBell('triple', '1')" style="width: 100%;">Triple (3x)</button>
+                        <button class="btn btn-secondary" onclick="testBell('continuo', '1')" style="width: 100%; margin-bottom: 8px;" disabled>Continuo</button>
+                        <button class="btn btn-secondary" onclick="testBell('intermitente', '1')" style="width: 100%; margin-bottom: 8px;" disabled>Intermitente (2x)</button>
+                        <button class="btn btn-secondary" onclick="testBell('triple', '1')" style="width: 100%;" disabled>Triple (3x)</button>
                     </div>
                     
                     <div class="control-section">
                         <h3>Pruebas Individuales - Timbre 2</h3>
-                        <button class="btn btn-secondary" onclick="testBell('continuo', '2')" style="width: 100%; margin-bottom: 8px;">Continuo</button>
-                        <button class="btn btn-secondary" onclick="testBell('intermitente', '2')" style="width: 100%; margin-bottom: 8px;">Intermitente (2x)</button>
-                        <button class="btn btn-secondary" onclick="testBell('triple', '2')" style="width: 100%;">Triple (3x)</button>
+                        <button class="btn btn-secondary" onclick="testBell('continuo', '2')" style="width: 100%; margin-bottom: 8px;" disabled>Continuo</button>
+                        <button class="btn btn-secondary" onclick="testBell('intermitente', '2')" style="width: 100%; margin-bottom: 8px;" disabled>Intermitente (2x)</button>
+                        <button class="btn btn-secondary" onclick="testBell('triple', '2')" style="width: 100%;" disabled>Triple (3x)</button>
                     </div>
                     
                     <div class="control-section">
-                        <h3>Pruebas Combinadas</h3>
-                        <button class="btn btn-primary" onclick="testBell('continuo', 'both')" style="width: 100%; margin-bottom: 8px;">Ambos Timbres</button>
-                        <button class="btn btn-warning" onclick="syncTime()" style="width: 100%; margin-bottom: 8px;">Sincronizar Hora Manual</button>
-                        <button class="btn btn-warning" onclick="forceNtpSync()" style="width: 100%; margin-bottom: 8px;">Sincronizar con NTP</button>
-                        <button class="btn btn-success" onclick="sendSchedulesToESP32()" style="width: 100%; margin-bottom: 8px;">Enviar Configuración</button>
-                        <button class="btn btn-danger" onclick="clearLocalStorage()" style="width: 100%;">Restablecer Config</button>
+                        <h3>Controles del Sistema</h3>
+                        <button class="btn btn-primary" onclick="testBell('continuo', 'both')" style="width: 100%; margin-bottom: 8px;" disabled>Ambos Timbres</button>
+                        <button class="btn btn-warning" onclick="syncTime()" style="width: 100%; margin-bottom: 8px;" disabled>Sincronizar Hora Manual</button>
+                        <button class="btn btn-warning" onclick="forceNtpSync()" style="width: 100%; margin-bottom: 8px;" disabled>Sincronizar con NTP</button>
+                        <button class="btn btn-success" onclick="sendSchedulesToESP32()" style="width: 100%; margin-bottom: 8px;" disabled>Enviar Configuración</button>
+                        <button class="btn btn-danger" onclick="clearLocalStorage()" style="width: 100%;">Restablecer IP</button>
                     </div>
                 </div>
             </div>
@@ -482,69 +554,89 @@
         </div>
     </div>
 
+    <!-- Modal para Agregar Horario -->
+    <div id="addScheduleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Agregar Nuevo Horario</h3>
+                <button class="modal-close" onclick="closeModal('addScheduleModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Nombre del Horario:</label>
+                    <input type="text" id="newScheduleName" class="form-input" placeholder="Ej: Entrada Turno Mañana">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Hora:</label>
+                    <input type="time" id="newScheduleTime" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Duración (segundos):</label>
+                    <input type="number" id="newScheduleDuration" class="form-input" min="1" max="30" value="3">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tipo de Timbre:</label>
+                    <select id="newScheduleType" class="form-select">
+                        <option value="continuo">Continuo</option>
+                        <option value="intermitente">Intermitente (2x)</option>
+                        <option value="triple">Triple (3x)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Relé(s) a Activar:</label>
+                    <select id="newScheduleRelay" class="form-select">
+                        <option value="1">Timbre 1</option>
+                        <option value="2">Timbre 2</option>
+                        <option value="both">Ambos Timbres</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('addScheduleModal')">Cancelar</button>
+                <button class="btn btn-success" onclick="createNewSchedule()">Crear Horario</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // ==================== VARIABLES GLOBALES ====================
         let schedules = [];
         let esp32Ip = '192.168.1.100';
         let isConnected = false;
 
-        // Funciones de almacenamiento local
-        function saveToLocalStorage() {
+        // ==================== GESTIÓN DE ALMACENAMIENTO LOCAL ====================
+        function saveIpToStorage() {
             try {
-                localStorage.setItem('timbre_schedules', JSON.stringify(schedules));
                 localStorage.setItem('timbre_esp32_ip', esp32Ip);
-                console.log('Configuración guardada en el navegador');
+                console.log('IP guardada en localStorage');
             } catch (error) {
-                console.error('Error guardando en localStorage:', error);
+                console.error('Error guardando IP:', error);
             }
         }
 
-        function loadFromLocalStorage() {
+        function loadIpFromStorage() {
             try {
-                const savedSchedules = localStorage.getItem('timbre_schedules');
                 const savedIp = localStorage.getItem('timbre_esp32_ip');
-                
-                if (savedSchedules) {
-                    schedules = JSON.parse(savedSchedules);
-                    console.log(`${schedules.length} horarios cargados desde el navegador`);
-                } else {
-                    // Solo usar ejemplos si no hay nada guardado
-                    loadExampleSchedules();
-                }
-                
                 if (savedIp) {
                     esp32Ip = savedIp;
                     document.getElementById('esp32Ip').value = savedIp;
+                    console.log('IP cargada desde localStorage:', savedIp);
                 }
             } catch (error) {
-                console.error('Error cargando desde localStorage:', error);
-                loadExampleSchedules();
+                console.error('Error cargando IP:', error);
             }
-        }
-
-        function loadExampleSchedules() {
-            schedules = [
-                { id: 1, name: 'Entrada Turno Mañana', time: '07:00', duration: 5, type: 'continuo', relay: 'both', enabled: true },
-                { id: 2, name: 'Descanso Matutino', time: '09:30', duration: 4, type: 'intermitente', relay: '1', enabled: true },
-                { id: 3, name: 'Hora de Almuerzo', time: '12:00', duration: 5, type: 'continuo', relay: 'both', enabled: true },
-                { id: 4, name: 'Descanso Vespertino', time: '15:30', duration: 4, type: 'intermitente', relay: '2', enabled: true },
-                { id: 5, name: 'Fin de Jornada Laboral', time: '17:00', duration: 6, type: 'triple', relay: 'both', enabled: true }
-            ];
-            console.log('Horarios de ejemplo cargados (primera vez)');
         }
 
         function clearLocalStorage() {
-            if (confirm('¿Está seguro de que desea eliminar toda la configuración guardada?')) {
-                localStorage.removeItem('timbre_schedules');
+            if (confirm('¿Está seguro de que desea restablecer la IP guardada?')) {
                 localStorage.removeItem('timbre_esp32_ip');
-                loadExampleSchedules();
                 document.getElementById('esp32Ip').value = '192.168.1.100';
                 esp32Ip = '192.168.1.100';
-                renderSchedules();
-                showModal('Configuración Eliminada', 'Se ha eliminado toda la configuración guardada y se han cargado los valores por defecto.', 'success');
+                showModal('IP Restablecida', 'La dirección IP ha sido restablecida a los valores por defecto.', 'success');
             }
         }
 
-        // Actualizar hora actual
+        // ==================== ACTUALIZACIÓN DE TIEMPO ====================
         function updateCurrentTime() {
             const now = new Date();
             document.getElementById('currentTime').textContent = now.toLocaleTimeString();
@@ -554,7 +646,7 @@
         setInterval(updateCurrentTime, 1000);
         updateCurrentTime();
 
-        // Modal functions
+        // ==================== GESTIÓN DE MODALES ====================
         function showModal(title, message, type = 'info') {
             document.getElementById('modalTitle').textContent = title;
             document.getElementById('modalBody').innerHTML = message;
@@ -565,7 +657,28 @@
             document.getElementById(modalId).classList.remove('show');
         }
 
-        // Conectar al ESP32
+        function showAddScheduleModal() {
+            if (!isConnected) {
+                showModal('Error', 'Debe conectarse al ESP32 antes de agregar horarios.', 'error');
+                return;
+            }
+
+            if (schedules.length >= 40) {
+                showModal('Límite Alcanzado', 'No se pueden agregar más de 40 horarios. Elimine algunos horarios existentes.', 'error');
+                return;
+            }
+
+            // Limpiar formulario
+            document.getElementById('newScheduleName').value = '';
+            document.getElementById('newScheduleTime').value = '08:00';
+            document.getElementById('newScheduleDuration').value = '3';
+            document.getElementById('newScheduleType').value = 'continuo';
+            document.getElementById('newScheduleRelay').value = '1';
+            
+            document.getElementById('addScheduleModal').classList.add('show');
+        }
+
+        // ==================== GESTIÓN DE CONEXIÓN ESP32 ====================
         async function connectToESP32() {
             esp32Ip = document.getElementById('esp32Ip').value;
             
@@ -584,9 +697,9 @@
                     isConnected = true;
                     updateConnectionStatus();
                     updateNtpStatus(data);
-                    saveToLocalStorage(); // Guardar IP cuando se conecte exitosamente
+                    saveIpToStorage();
                     showModal('Conexión Exitosa', `Conectado correctamente al ESP32 en la dirección ${esp32Ip}`, 'success');
-                    loadSchedulesFromESP32();
+                    await loadSchedulesFromESP32();
                 } else {
                     throw new Error('No se pudo conectar');
                 }
@@ -601,7 +714,34 @@
             }
         }
 
-        // Actualizar información de NTP
+        function updateConnectionStatus() {
+            const indicator = document.getElementById('connectionIndicator');
+            const status = document.getElementById('connectionStatus');
+            const warning = document.getElementById('connectionWarning');
+            const addBtn = document.getElementById('addScheduleBtn');
+            
+            // Obtener todos los botones de control
+            const controlButtons = document.querySelectorAll('.control-section .btn:not(.btn-danger)');
+            
+            if (isConnected) {
+                indicator.classList.add('connected');
+                status.textContent = 'Conectado';
+                warning.classList.add('hidden');
+                addBtn.disabled = false;
+                
+                // Habilitar botones de control
+                controlButtons.forEach(btn => btn.disabled = false);
+            } else {
+                indicator.classList.remove('connected');
+                status.textContent = 'Desconectado';
+                warning.classList.remove('hidden');
+                addBtn.disabled = true;
+                
+                // Deshabilitar botones de control
+                controlButtons.forEach(btn => btn.disabled = true);
+            }
+        }
+
         function updateNtpStatus(data) {
             const ntpElement = document.getElementById('lastNtpSync');
             if (data.hours_since_ntp_sync !== undefined) {
@@ -622,93 +762,138 @@
             }
         }
 
-        // Actualizar estado de conexión
-        function updateConnectionStatus() {
-            const indicator = document.getElementById('connectionIndicator');
-            const status = document.getElementById('connectionStatus');
-            
-            if (isConnected) {
-                indicator.classList.add('connected');
-                status.textContent = 'Conectado';
-            } else {
-                indicator.classList.remove('connected');
-                status.textContent = 'Desconectado';
-            }
-        }
+        // ==================== GESTIÓN DE HORARIOS ====================
+        async function createNewSchedule() {
+            const name = document.getElementById('newScheduleName').value.trim();
+            const time = document.getElementById('newScheduleTime').value;
+            const duration = parseInt(document.getElementById('newScheduleDuration').value);
+            const type = document.getElementById('newScheduleType').value;
+            const relay = document.getElementById('newScheduleRelay').value;
 
-        // Agregar nuevo horario
-        function addSchedule() {
-            if (schedules.length >= 40) {
-                showModal('Límite Alcanzado', 'No se pueden agregar más de 40 horarios. Elimine algunos horarios existentes si necesita agregar nuevos.', 'error');
+            if (!name) {
+                showModal('Error', 'Debe ingresar un nombre para el horario.', 'error');
                 return;
             }
-            
-            const schedule = {
+
+            if (!time) {
+                showModal('Error', 'Debe seleccionar una hora para el horario.', 'error');
+                return;
+            }
+
+            const newSchedule = {
                 id: Date.now(),
-                name: 'Nuevo Horario',
-                time: '08:00',
-                duration: 3,
-                type: 'continuo',
-                relay: '1',
+                name: name,
+                time: time,
+                duration: duration,
+                type: type,
+                relay: relay,
                 enabled: true
             };
-            
-            schedules.push(schedule);
-            renderSchedules();
-            saveToLocalStorage(); // Guardar automáticamente
+
+            try {
+                // Enviar directamente al ESP32
+                const response = await fetch(`http://${esp32Ip}/schedules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ schedules: [...schedules, newSchedule] })
+                });
+
+                if (response.ok) {
+                    schedules.push(newSchedule);
+                    renderSchedules();
+                    closeModal('addScheduleModal');
+                    showModal('Horario Creado', `El horario "${name}" ha sido creado y enviado al ESP32 exitosamente.`, 'success');
+                } else {
+                    throw new Error('Error al crear horario en ESP32');
+                }
+            } catch (error) {
+                showModal('Error', 'No se pudo crear el horario en el ESP32. Verifique la conexión.', 'error');
+            }
         }
 
-        // Renderizar lista de horarios
+        async function deleteSchedule(id) {
+            if (!confirm('¿Está seguro de que desea eliminar este horario?')) {
+                return;
+            }
+
+            try {
+                // Eliminar del array local
+                schedules = schedules.filter(s => s.id !== id);
+                
+                // Enviar array actualizado al ESP32
+                const response = await fetch(`http://${esp32Ip}/schedules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ schedules })
+                });
+
+                if (response.ok) {
+                    renderSchedules();
+                    showModal('Horario Eliminado', 'El horario ha sido eliminado exitosamente del ESP32.', 'success');
+                } else {
+                    throw new Error('Error al eliminar horario del ESP32');
+                }
+            } catch (error) {
+                showModal('Error', 'No se pudo eliminar el horario del ESP32. Verifique la conexión.', 'error');
+                // Recargar horarios del ESP32 para sincronizar
+                await loadSchedulesFromESP32();
+            }
+        }
+
         function renderSchedules() {
             const container = document.getElementById('scheduleList');
             container.innerHTML = '';
 
-            // Actualizar contador de horarios
+            // Actualizar contador
             document.getElementById('scheduleCount').textContent = schedules.length;
 
+            if (schedules.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #7f8c8d;">
+                        <p style="font-size: 1.2rem; margin-bottom: 10px;">📋</p>
+                        <p>No hay horarios configurados</p>
+                        <p style="font-size: 0.9rem; margin-top: 10px;">Agregue un nuevo horario para comenzar</p>
+                    </div>
+                `;
+                return;
+            }
+
             schedules.forEach((schedule, index) => {
+                const typeText = schedule.type === 'continuo' ? 'Continuo' : 
+                               schedule.type === 'intermitente' ? 'Intermitente (2x)' : 'Triple (3x)';
+                const relayText = schedule.relay === '1' ? 'Timbre 1' : 
+                                schedule.relay === '2' ? 'Timbre 2' : 'Ambos Timbres';
+                
                 const div = document.createElement('div');
                 div.className = 'schedule-item';
                 div.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h4 style="color: #2c3e50; margin: 0;">Horario ${index + 1}</h4>
-                        <small style="color: #7f8c8d;">ID: ${schedule.id}</small>
+                    <div class="schedule-header">
+                        <h4 style="color: #2c3e50; margin: 0;">${schedule.name}</h4>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <span style="padding: 4px 8px; background: ${schedule.enabled ? '#27ae60' : '#95a5a6'}; color: white; border-radius: 4px; font-size: 0.8rem;">
+                                ${schedule.enabled ? 'ACTIVO' : 'INACTIVO'}
+                            </span>
+                            <button class="btn btn-danger" onclick="deleteSchedule(${schedule.id})" style="padding: 6px 12px; min-height: auto;">
+                                Eliminar
+                            </button>
+                        </div>
                     </div>
-                    <div class="schedule-controls">
-                        <div class="form-group">
-                            <label class="form-label">Nombre del Horario:</label>
-                            <input type="text" class="form-input" value="${schedule.name}" onchange="updateSchedule(${schedule.id}, 'name', this.value)">
+                    <div class="schedule-info">
+                        <div class="info-item">
+                            <div class="info-label">Hora de Activación</div>
+                            <div class="info-value">⏰ ${schedule.time}</div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Hora:</label>
-                            <input type="time" class="form-input" value="${schedule.time}" onchange="updateSchedule(${schedule.id}, 'time', this.value)">
+                        <div class="info-item">
+                            <div class="info-label">Duración</div>
+                            <div class="info-value">⏱️ ${schedule.duration} segundos</div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Duración (seg):</label>
-                            <input type="number" class="form-input" min="1" max="30" value="${schedule.duration}" onchange="updateSchedule(${schedule.id}, 'duration', this.value)">
+                        <div class="info-item">
+                            <div class="info-label">Tipo de Timbre</div>
+                            <div class="info-value">🔔 ${typeText}</div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Tipo de Timbre:</label>
-                            <select class="form-select" onchange="updateSchedule(${schedule.id}, 'type', this.value)">
-                                <option value="continuo" ${schedule.type === 'continuo' ? 'selected' : ''}>Continuo</option>
-                                <option value="intermitente" ${schedule.type === 'intermitente' ? 'selected' : ''}>Intermitente (2x)</option>
-                                <option value="triple" ${schedule.type === 'triple' ? 'selected' : ''}>Triple (3x)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Relé(s):</label>
-                            <select class="form-select" onchange="updateSchedule(${schedule.id}, 'relay', this.value)">
-                                <option value="1" ${schedule.relay === '1' ? 'selected' : ''}>Timbre 1</option>
-                                <option value="2" ${schedule.relay === '2' ? 'selected' : ''}>Timbre 2</option>
-                                <option value="both" ${schedule.relay === 'both' ? 'selected' : ''}>Ambos Timbres</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <div class="checkbox-container">
-                                <input type="checkbox" ${schedule.enabled ? 'checked' : ''} onchange="updateSchedule(${schedule.id}, 'enabled', this.checked)">
-                                <label class="form-label">Activo</label>
-                            </div>
-                            <button class="btn btn-danger" onclick="deleteSchedule(${schedule.id})" style="margin-top: 10px; width: 100%;">Eliminar</button>
+                        <div class="info-item">
+                            <div class="info-label">Relé(s) Activos</div>
+                            <div class="info-value">📡 ${relayText}</div>
                         </div>
                     </div>
                 `;
@@ -716,25 +901,23 @@
             });
         }
 
-        // Actualizar horario
-        function updateSchedule(id, field, value) {
-            const schedule = schedules.find(s => s.id === id);
-            if (schedule) {
-                schedule[field] = field === 'duration' ? parseInt(value) : value;
-                saveToLocalStorage(); // Guardar automáticamente cuando se modifica
+        async function loadSchedulesFromESP32() {
+            try {
+                const response = await fetch(`http://${esp32Ip}/schedules`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.schedules) {
+                        schedules = data.schedules;
+                        renderSchedules();
+                        console.log(`${schedules.length} horarios cargados desde ESP32`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error cargando horarios desde ESP32:', error);
             }
         }
 
-        // Eliminar horario
-        function deleteSchedule(id) {
-            if (confirm('¿Está seguro de que desea eliminar este horario?')) {
-                schedules = schedules.filter(s => s.id !== id);
-                renderSchedules();
-                saveToLocalStorage(); // Guardar automáticamente cuando se elimina
-            }
-        }
-
-        // Probar timbre
+        // ==================== CONTROL MANUAL DE TIMBRES ====================
         async function testBell(type = 'continuo', relay = '1') {
             if (!isConnected) {
                 showModal('Error', 'Debe conectarse al ESP32 antes de realizar pruebas.', 'error');
@@ -761,7 +944,7 @@
             }
         }
 
-        // Sincronizar tiempo
+        // ==================== SINCRONIZACIÓN DE TIEMPO ====================
         async function syncTime() {
             if (!isConnected) {
                 showModal('Error', 'Debe conectarse al ESP32 antes de sincronizar la hora.', 'error');
@@ -787,7 +970,6 @@
 
                 if (response.ok) {
                     showModal('Sincronización Exitosa', 'La hora del ESP32 ha sido sincronizada correctamente con la hora del sistema.', 'success');
-                    // Actualizar estado NTP
                     setTimeout(checkNtpStatus, 1000);
                 } else {
                     throw new Error('Error al sincronizar');
@@ -797,7 +979,6 @@
             }
         }
 
-        // Forzar sincronización NTP
         async function forceNtpSync() {
             if (!isConnected) {
                 showModal('Error', 'Debe conectarse al ESP32 antes de sincronizar con NTP.', 'error');
@@ -811,7 +992,6 @@
 
                 if (response.ok) {
                     showModal('Sincronización NTP Exitosa', 'El ESP32 se ha sincronizado correctamente con los servidores NTP. La hora es ahora precisa y se mantendrá automáticamente cada 24 horas.', 'success');
-                    // Actualizar estado NTP
                     setTimeout(checkNtpStatus, 2000);
                 } else {
                     throw new Error('Error al sincronizar con NTP');
@@ -821,7 +1001,6 @@
             }
         }
 
-        // Verificar estado NTP
         async function checkNtpStatus() {
             if (!isConnected) return;
             
@@ -836,7 +1015,7 @@
             }
         }
 
-        // Enviar horarios al ESP32
+        // ==================== ENVÍO DE CONFIGURACIÓN ====================
         async function sendSchedulesToESP32() {
             if (!isConnected) {
                 showModal('Error', 'Debe conectarse al ESP32 antes de enviar la configuración.', 'error');
@@ -865,41 +1044,29 @@
             }
         }
 
-        // Cargar horarios desde ESP32
-        async function loadSchedulesFromESP32() {
-            try {
-                const response = await fetch(`http://${esp32Ip}/schedules`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.schedules && data.schedules.length > 0) {
-                        schedules = data.schedules;
-                        renderSchedules();
-                        saveToLocalStorage(); // Guardar los horarios cargados del ESP32
-                        showModal('Horarios Sincronizados', `Se han cargado ${schedules.length} horarios desde el ESP32 y se han guardado en el navegador.`, 'success');
-                    }
-                }
-            } catch (error) {
-                console.error('Error cargando horarios:', error);
-            }
-        }
-
-        // Cerrar modal al hacer clic fuera de él
+        // ==================== EVENTOS Y INICIALIZACIÓN ====================
         window.onclick = function(event) {
-            const modal = document.getElementById('statusModal');
-            if (event.target === modal) {
+            const statusModal = document.getElementById('statusModal');
+            const addModal = document.getElementById('addScheduleModal');
+            if (event.target === statusModal) {
                 closeModal('statusModal');
             }
+            if (event.target === addModal) {
+                closeModal('addScheduleModal');
+            }
         }
 
-        // Inicializar al cargar la página
-        document.addEventListener('DOMContentLoaded', function() {
-            loadFromLocalStorage();
-            renderSchedules();
+        // Actualizar IP cuando cambie el input
+        document.getElementById('esp32Ip').addEventListener('change', function() {
+            esp32Ip = this.value;
         });
 
-        // Cargar configuración al iniciar
-        loadFromLocalStorage();
-        renderSchedules();
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            loadIpFromStorage();
+            updateConnectionStatus();
+            renderSchedules();
+        });
 
         // Verificar estado NTP cada 5 minutos si está conectado
         setInterval(() => {
@@ -907,6 +1074,11 @@
                 checkNtpStatus();
             }
         }, 5 * 60 * 1000);
+
+        // Cargar IP al inicio
+        loadIpFromStorage();
+        updateConnectionStatus();
+        renderSchedules();
     </script>
 </body>
 </html>
